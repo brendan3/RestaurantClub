@@ -8,6 +8,7 @@ import Dashboard from "@/pages/Dashboard";
 import History from "@/pages/History";
 import Club from "@/pages/Club";
 import Profile from "@/pages/Profile";
+import Social from "@/pages/Social";
 import AppShell from "@/components/layout/AppShell";
 
 function Router() {
@@ -15,6 +16,7 @@ function Router() {
     <AppShell>
       <Switch>
         <Route path="/" component={Dashboard} />
+        <Route path="/social" component={Social} />
         <Route path="/history" component={History} />
         <Route path="/club" component={Club} />
         <Route path="/profile" component={Profile} />

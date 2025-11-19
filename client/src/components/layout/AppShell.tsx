@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Map, Users, User, PlusCircle } from "lucide-react";
+import { Home, Map, Users, User, PlusCircle, MessageCircle } from "lucide-react";
 import { ASSETS } from "@/lib/mockData";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -7,6 +7,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { href: "/", icon: Home, label: "Home" },
+    { href: "/social", icon: MessageCircle, label: "Social" },
     { href: "/history", icon: Map, label: "History" },
     { href: "/club", icon: Users, label: "Club" },
     { href: "/profile", icon: User, label: "Me" },

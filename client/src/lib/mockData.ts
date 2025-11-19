@@ -7,6 +7,11 @@ import food2 from "@assets/stock_images/delicious_restaurant_82c2ad63.jpg";
 import food3 from "@assets/stock_images/delicious_restaurant_bde7cc18.jpg";
 import food4 from "@assets/stock_images/delicious_restaurant_21705833.jpg";
 
+// New Social Assets
+import pizzaImg from "@assets/stock_images/group_of_friends_eat_88e7a824.jpg"; 
+import sushiImg from "@assets/stock_images/sushi_boat_presentat_b9bcc640.jpg"; 
+import steakImg from "@assets/stock_images/fancy_steak_dinner_2185d6ef.jpg"; 
+
 export const CURRENT_USER = {
   id: "u1",
   name: "Alex",
@@ -78,6 +83,7 @@ export const SOCIAL_FEED = [
     content: "Still dreaming about that truffle pasta from La Trattoria! 🍝",
     time: "2 hours ago",
     likes: 3,
+    context: "private"
   },
   {
     id: "p2",
@@ -87,7 +93,90 @@ export const SOCIAL_FEED = [
     image: food2,
     time: "Yesterday",
     likes: 8,
+    context: "private"
   },
+];
+
+// --- NEW DATA FOR SOCIAL FEATURES ---
+
+export const DISCOVERABLE_CLUBS = [
+  {
+    id: "c2",
+    name: "The Pizza Society",
+    members: 12,
+    type: "Public",
+    tags: ["Pizza", "Casual", "Beer"],
+    image: pizzaImg, 
+    description: "On a mission to find the best slice in the city."
+  },
+  {
+    id: "c3",
+    name: "Fine Dining Divas",
+    members: 6,
+    type: "Private",
+    tags: ["Luxury", "Wine", "Dressy"],
+    image: steakImg, 
+    description: "Monthly high-end gastronomic experiences."
+  },
+  {
+    id: "c4",
+    name: "Taco Tuesday Team",
+    members: 28,
+    type: "Public",
+    tags: ["Mexican", "Spicy", "Cheap Eats"],
+    image: food4, 
+    description: "Every Tuesday, a new taco spot."
+  },
+  {
+    id: "c5",
+    name: "Sushi Seekers",
+    members: 15,
+    type: "Public",
+    tags: ["Sushi", "Japanese", "Seafood"],
+    image: sushiImg,
+    description: "Rolling through the city one maki at a time."
+  }
+];
+
+export const PUBLIC_FEED = [
+  {
+    id: "pub1",
+    clubName: "The Pizza Society",
+    clubImage: "https://api.dicebear.com/7.x/initials/svg?seed=PS",
+    user: { name: "Mario", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Mario" },
+    type: "review",
+    restaurant: "Tony's Brick Oven",
+    rating: 5,
+    content: "Hands down the best crust we've had all year. The char is perfection.",
+    image: pizzaImg, 
+    time: "3 hours ago",
+    likes: 42,
+    comments: 5
+  },
+  {
+    id: "pub2",
+    clubName: "Taco Tuesday Team",
+    clubImage: "https://api.dicebear.com/7.x/initials/svg?seed=TT",
+    user: { name: "Luisa", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Luisa" },
+    type: "milestone",
+    content: "We just hit our 100th taco spot! 🎉🌮 Time to celebrate!",
+    image: food4, 
+    time: "5 hours ago",
+    likes: 156,
+    comments: 23
+  },
+  {
+    id: "pub3",
+    clubName: "Sushi Seekers",
+    clubImage: "https://api.dicebear.com/7.x/initials/svg?seed=SS",
+    user: { name: "Kenji", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Kenji" },
+    type: "photo",
+    content: "Omakase night was a success. Look at this presentation!",
+    image: sushiImg,
+    time: "1 day ago",
+    likes: 89,
+    comments: 12
+  }
 ];
 
 export const SUPERLATIVES = [
