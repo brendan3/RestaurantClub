@@ -9,6 +9,7 @@ import History from "@/pages/History";
 import Club from "@/pages/Club";
 import Profile from "@/pages/Profile";
 import Social from "@/pages/Social";
+import CreateClub from "@/pages/CreateClub";
 import AppShell from "@/components/layout/AppShell";
 
 function Router() {
@@ -19,6 +20,7 @@ function Router() {
         <Route path="/social" component={Social} />
         <Route path="/history" component={History} />
         <Route path="/club" component={Club} />
+        <Route path="/create-club" component={CreateClub} />
         <Route path="/profile" component={Profile} />
         <Route component={NotFound} />
       </Switch>
