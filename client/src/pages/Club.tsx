@@ -16,11 +16,11 @@ export default function Club() {
         <p className="text-muted-foreground text-lg">Est. 2024 • 5 Members • 14 Dinners</p>
         
         <div className="flex justify-center pt-2">
-           <Link href="/create-club">
-             <Button className="rounded-full font-bold bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all hover:scale-105">
+           <Button asChild className="rounded-full font-bold bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all hover:scale-105">
+             <Link href="/create-club">
                 <Plus className="w-4 h-4 mr-2" /> Start New Club
-             </Button>
-           </Link>
+             </Link>
+           </Button>
         </div>
       </div>
 

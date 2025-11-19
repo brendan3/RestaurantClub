@@ -29,15 +29,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           {navItems.map((item) => {
             const isActive = location === item.href;
             return (
-              <Link key={item.href} href={item.href}>
-                <a className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium group ${
+              <Link key={item.href} href={item.href} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium group ${
                   isActive 
                     ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" 
                     : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 }`}>
                   <item.icon className={`w-5 h-5 ${isActive ? "fill-current" : "group-hover:scale-110 transition-transform"}`} />
                   {item.label}
-                </a>
               </Link>
             );
           })}
@@ -75,8 +73,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {navItems.map((item) => {
           const isActive = location === item.href;
           return (
-            <Link key={item.href} href={item.href}>
-              <a className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${
+            <Link key={item.href} href={item.href} className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${
                 isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
               }`}>
                 <div className={`relative ${isActive ? "-translate-y-1" : ""} transition-transform duration-200`}>
@@ -84,7 +81,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   {isActive && <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-1 h-1 bg-primary rounded-full" />}
                 </div>
                 <span className="text-[10px] font-medium">{item.label}</span>
-              </a>
             </Link>
           );
         })}
