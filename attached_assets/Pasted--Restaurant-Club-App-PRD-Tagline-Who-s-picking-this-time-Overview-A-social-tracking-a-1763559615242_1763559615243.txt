@@ -1,0 +1,190 @@
+# Restaurant Club App - PRD
+**Tagline: "Who's picking this time?"**
+
+## Overview
+A social tracking app for restaurant clubs to coordinate monthly dining adventures, track attendance, share reviews, and build a collective dining history.
+
+## Core User Flow
+1. **Club Setup**: Create club with zip code (shows other clubs within 25 miles)
+2. **Monthly Cycle**: Member picks restaurant → Poll/confirm → Book via OpenTable → Dine → Review/photos → Repeat
+3. **Social Layer**: Comments, mentions, photo sharing throughout the experience
+
+## User Types
+- **Eaters**: Club members who participate in monthly dinners
+- **Club Admin**: Creates club, manages members (optional role)
+
+## Core Features
+
+### 🏠 Home Dashboard
+- Current month's restaurant with countdown
+- Reservation details and confirmation
+- Quick stats (your attendance, upcoming picker)
+- Recent photos from club
+- Notifications for comments/mentions
+
+### 📍 Where We've Been
+- **List View**: All past restaurants with ratings, photos, attendance
+- **Map View**: Google Maps integration showing all locations
+- **Entry Details**:
+  - Restaurant name & basic info
+  - Who chose it & when (month/year)
+  - Total bill amount
+  - Notable tags (BYOB, tasting menu, $$$, etc.)
+  - Individual attendance status
+  - Club average rating (out of 5 stars)
+  - Photos uploaded by members
+  - Individual reviews & comments
+  - @mentions support
+  - Reservation history (date, time, party size)
+
+### 🗳️ Restaurant Selection
+- **Monthly Picker Rotation**: Automatic assignment with notifications
+- **Wishlist**: Shared list of future restaurant candidates
+- **Poll System**: Vote on final choice if picker wants input
+- **AI Search**: Find restaurants by cuisine, tags, location with filters
+- **Picker Reminders**: Automated nudges when it's your turn
+- **OpenTable Integration**: 
+  - Check real-time availability while browsing
+  - See available time slots for your party size
+  - View restaurant menus before deciding
+  - Book directly from app once confirmed
+  - Manage and modify reservations
+  - Automatic calendar invites sent to attendees
+
+### 📊 Rankings & Stats
+- **Attendance Leaderboard**: Who's been to the most dinners
+- **Restaurant Rankings**: Highest rated places by the club
+- **Most Expensive**: Track your splurges
+- **Personal Stats**: Individual attendance rate, favorite cuisines
+
+### 👥 Social Features
+- **Comments**: On any restaurant entry
+- **Photo Uploads**: Multiple photos per restaurant
+- **@Mentions**: Notify specific eaters
+- **New Member Board**: Welcome area for recent joins
+- **Activity Feed**: Recent comments, photos, check-ins
+
+### 🏆 Eater Superlatives
+- **Monthly Awards**: Auto-generated fun awards based on dining behavior
+  - "Most Likely to Order the Weirdest Thing"
+  - "The Sauce Collector"
+  - "First to Finish" vs "Savors Every Bite"
+  - "Most Adventurous Palate"
+  - "The Photographer"
+  - "Question Master"
+- **Award History**: Track superlatives over time
+- **Voting**: Members can vote on certain categories
+- **Profile Integration**: Display awards on member profiles
+
+### 🔍 Dining Déjà Vu Detector
+- **Restaurant DNA**: Analyze cuisine, price, ambiance, photo aesthetics
+- **Similarity Matching**: Show percentage matches to previous restaurants
+- **Smart Suggestions**: 
+  - "This gives me major [previous restaurant] vibes - 87% match"
+  - "Warning: Basically identical to Mario's from March 2023"
+  - "Plot twist: Complete opposite of anywhere you've been"
+- **Avoid Repeats**: Flag similar experiences before booking
+
+### 🔔 Notifications
+- Your turn to pick a restaurant
+- New comments on places you've been
+- @mentions
+- Poll voting reminders
+- Monthly dinner reminders
+- Reservation confirmations
+- Monthly superlative announcements
+
+## Technical Requirements
+
+### Data Models
+```
+Club {
+  id, name, zipCode, createdAt
+  members: [User]
+  restaurants: [RestaurantEntry]
+  wishlist: [Restaurant]
+}
+
+User {
+  id, name, email, avatar
+  clubs: [Club]
+}
+
+RestaurantEntry {
+  id, restaurant, picker, month, year
+  totalBill, tags: [String]
+  attendees: [Attendance]
+  photos: [Photo]
+  comments: [Comment]
+  clubRating: Number
+  reservation: {
+    openTableId, date, time, partySize
+    confirmationNumber, status
+  }
+}
+
+Attendance {
+  userId, attended: Boolean
+  individualRating: Number
+  review: String
+}
+```
+
+### Core Integrations
+- **Google Maps API**: Restaurant search, map display
+- **Google Places API**: Restaurant details, reviews
+- **OpenTable API**: Restaurant availability, reservations, menus
+  - Check real-time availability for party size
+  - Browse available time slots
+  - Direct booking from app
+  - Reservation management (modify, cancel)
+  - Confirmation and reminder emails
+  - Restaurant details, photos, and menus
+  - Hours and contact information
+- **Push Notifications**: Reminders and social notifications
+- **Image Storage**: Photo uploads with compression
+
+### MVP Scope
+**Phase 1 - Core Tracking**
+- Club creation & member management
+- Restaurant entry creation
+- Basic photo upload
+- Simple attendance tracking
+- OpenTable basic integration (view availability, restaurant details)
+
+**Phase 2 - Social Layer**
+- Comments & mentions
+- Ranking pages
+- Notifications
+- Eater Superlatives system
+- Full OpenTable booking flow
+
+**Phase 3 - Discovery & Advanced**
+- AI restaurant search
+- Wishlist management
+- Polling system
+- Dining Déjà Vu Detector
+- Reservation management (modify/cancel)
+
+## UI/UX Guidelines
+- **Vibe**: Fun, friendly, social
+- **Colors**: Food-inspired palette (warm oranges, deep reds, fresh greens)
+- **Typography**: Casual but readable
+- **Photography**: Emphasize food photos, group shots
+- **Interactions**: Swipe between restaurants, tap to expand details
+- **Booking Flow**: Seamless 2-3 tap reservation process
+
+## Success Metrics
+Since this is for personal use:
+- Daily active usage by club members
+- Photos uploaded per restaurant
+- Comments/engagement per entry
+- Picker compliance rate (people actually choosing on time)
+- Reservation completion rate via OpenTable
+
+## Future Considerations
+- Multi-club support for eaters
+- Recipe sharing for home cooking months
+- Annual "best of" summaries
+- Split bill calculator integration
+- Dietary restrictions tracking
