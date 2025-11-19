@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, Upload, Globe, Lock, Users, Check, Info } from "lucide-react";
+import { ArrowLeft, Upload, Globe, Lock, Users, Check, Info, Sparkles, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,12 +14,14 @@ import { toast } from "@/hooks/use-toast";
 export default function CreateClub() {
   const [, setLocation] = useLocation();
   const [step, setStep] = useState(1);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     privacy: "public",
     location: "",
-    vibe: "casual"
+    vibe: "casual",
+    coverImage: "" 
   });
 
   const handleNext = () => setStep(step + 1);
@@ -33,6 +35,20 @@ export default function CreateClub() {
       description: `"${formData.name}" is now live. Time to eat!`,
     });
     setLocation("/club");
+  };
+
+  const handleGenerateImage = () => {
+    setIsGenerating(true);
+    // Simulate API call
+    setTimeout(() => {
+      setIsGenerating(false);
+      toast({
+        title: "Image Generated! ✨",
+        description: "Your AI-generated cover art is ready.",
+      });
+      // Set a mock image or leave blank but show success
+      setFormData(prev => ({...prev, coverImage: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1000&q=80"})); 
+    }, 2000);
   };
 
   return (
@@ -142,11 +158,50 @@ export default function CreateClub() {
 
             {/* Step 3: Cover Image */}
             <div className={`space-y-6 animate-in fade-in slide-in-from-right-4 duration-500 ${step !== 3 ? 'hidden' : ''}`}>
-               <div className="border-2 border-dashed border-muted-foreground/25 rounded-2xl p-10 text-center hover:bg-muted/20 transition-colors cursor-pointer">
-                 <Upload className="w-10 h-10 text-muted-foreground mx-auto mb-4" />
-                 <p className="font-bold text-lg">Upload Cover Photo</p>
-                 <p className="text-sm text-muted-foreground mt-1">Or drag and drop an image here</p>
+               <Label>Club Cover Art</Label>
+               
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                 {/* Standard Upload */}
+                 <div className="border-2 border-dashed border-muted-foreground/25 rounded-2xl p-6 text-center hover:bg-muted/20 transition-colors cursor-pointer flex flex-col items-center justify-center min-h-[200px]">
+                   <Upload className="w-8 h-8 text-muted-foreground mb-3" />
+                   <p className="font-bold">Upload Photo</p>
+                   <p className="text-xs text-muted-foreground mt-1">Drag & drop or browse</p>
+                 </div>
+
+                 {/* AI Generation Placeholder */}
+                 <div className="border-2 border-primary/20 bg-primary/5 rounded-2xl p-6 flex flex-col justify-between min-h-[200px]">
+                   <div className="text-center">
+                     <Sparkles className="w-8 h-8 text-primary mx-auto mb-3" />
+                     <p className="font-bold text-primary">Generate with AI</p>
+                     <p className="text-xs text-muted-foreground mt-1 mb-4">Create unique art based on your club name</p>
+                   </div>
+                   
+                   <div className="space-y-2">
+                     <Input placeholder="e.g. futuristic pizza party" className="bg-background/50 text-xs h-8" />
+                     <Button 
+                       type="button" 
+                       onClick={handleGenerateImage} 
+                       disabled={isGenerating}
+                       className="w-full h-8 text-xs font-bold bg-primary text-primary-foreground"
+                     >
+                       {isGenerating ? (
+                         <span className="flex items-center gap-2">Generating...</span>
+                       ) : (
+                         <span className="flex items-center gap-2"><Wand2 className="w-3 h-3" /> Generate</span>
+                       )}
+                     </Button>
+                   </div>
+                 </div>
                </div>
+
+               {formData.coverImage && (
+                 <div className="relative rounded-xl overflow-hidden border-2 border-primary shadow-md animate-in fade-in zoom-in duration-300">
+                   <img src={formData.coverImage} alt="Generated Cover" className="w-full h-48 object-cover" />
+                   <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-md backdrop-blur-md">
+                     Selected Cover
+                   </div>
+                 </div>
+               )}
                
                <div className="bg-blue-50 text-blue-900 dark:bg-blue-900/20 dark:text-blue-100 p-4 rounded-xl text-sm flex gap-3 items-start">
                  <Info className="w-5 h-5 shrink-0 mt-0.5" />
@@ -180,9 +235,14 @@ export default function CreateClub() {
             <h3 className="font-heading font-bold text-sm uppercase text-muted-foreground tracking-wider">Preview</h3>
             
             <div className="bg-card rounded-2xl overflow-hidden border shadow-lg">
-              <div className="h-40 bg-muted relative">
+              <div className="h-40 bg-muted relative group">
                 {/* Placeholder for uploaded image */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                {formData.coverImage ? (
+                   <img src={formData.coverImage} className="w-full h-full object-cover" />
+                ) : (
+                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                )}
+                
                 <div className="absolute top-3 right-3">
                    <Badge variant="secondary" className="backdrop-blur-md bg-black/50 text-white border-none">
                      {formData.privacy === "private" ? <Lock className="w-3 h-3 mr-1" /> : <Globe className="w-3 h-3 mr-1" />}
