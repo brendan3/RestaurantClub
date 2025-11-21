@@ -1,9 +1,10 @@
 import { CURRENT_USER } from "@/lib/mockData";
+import { Link } from "wouter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Settings, Award, Star, LogOut } from "lucide-react";
+import { Settings, Award, Star, LogOut, Users } from "lucide-react";
 
 export default function Profile() {
   return (
@@ -36,6 +37,21 @@ export default function Profile() {
               <span className="text-xs text-muted-foreground font-medium uppercase">Avg Rating</span>
             </CardContent>
          </Card>
+      </div>
+
+      {/* My Clubs - Mobile Only Shortcut */}
+      <div className="md:hidden">
+         <Button asChild variant="outline" className="w-full h-14 justify-between px-4 rounded-2xl bg-white border-border/50 shadow-sm">
+            <Link href="/club">
+               <span className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+                     <Users className="w-4 h-4" />
+                  </div>
+                  <span className="font-bold">My Club</span>
+               </span>
+               <span className="text-xs text-muted-foreground">View Details &rarr;</span>
+            </Link>
+         </Button>
       </div>
 
       <Card className="border-none shadow-soft">

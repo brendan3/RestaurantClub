@@ -90,9 +90,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <button className="w-9 h-9 rounded-full bg-primary text-white shadow-sm flex items-center justify-center active:scale-95 transition-transform">
                 <Plus className="w-5 h-5" />
             </button>
-            <button className="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center text-foreground/80">
-                <User className="w-4 h-4" />
-            </button>
+            <Link href="/profile">
+                <button className="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center text-foreground/80">
+                    <User className="w-4 h-4" />
+                </button>
+            </Link>
         </div>
       </header>
 
