@@ -9,7 +9,7 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   
-  /* Warm, Food-Inspired Palette */
+  /* Warm, Food-Inspired Palette - Softened Version */
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
   
@@ -56,111 +56,112 @@
   --font-sans: 'DM Sans', sans-serif;
   --font-heading: 'Outfit', sans-serif;
   
-  --radius: 0.75rem;
+  /* Softer, bubblier radius */
+  --radius: 1.5rem; 
   
-  --shadow-soft: 0 4px 20px -2px rgba(217, 119, 6, 0.1);
+  /* Diffused, gentle shadows */
+  --shadow-soft: 0 8px 30px -6px rgba(217, 119, 6, 0.08);
+  --shadow-float: 0 12px 40px -8px rgba(0, 0, 0, 0.05);
 }
 
-/* LIGHT MODE - Warm & Inviting */
+/* LIGHT MODE - Soft & Warm */
 :root {
-  /* Creamy off-white background like a menu or tablecloth */
-  --background: 36 30% 96%; 
-  /* Dark brown text for softness */
-  --foreground: 20 14% 4%; 
+  /* Creamy, milky background */
+  --background: 36 30% 98%; 
+  /* Soft Charcoal/Brown text - less harsh than black */
+  --foreground: 20 10% 20%; 
 
-  /* White cards with subtle warmth */
+  /* White cards with warm undertone */
   --card: 0 0% 100%;
-  --card-foreground: 20 14% 4%;
+  --card-foreground: 20 10% 20%;
  
   --popover: 0 0% 100%;
-  --popover-foreground: 20 14% 4%;
+  --popover-foreground: 20 10% 20%;
  
-  /* Chef Orange - Vibrant and appetizing */
-  --primary: 25 95% 53%;
-  --primary-foreground: 60 9.1% 97.8%;
+  /* Soft Coral/Salmon - Friendly and inviting */
+  --primary: 18 90% 65%; 
+  --primary-foreground: 0 0% 100%;
  
-  /* Deep Red / Terracotta for accents */
-  --secondary: 10 70% 92%;
-  --secondary-foreground: 10 60% 30%;
+  /* Warm Beige/Sand for secondary elements */
+  --secondary: 36 50% 94%;
+  --secondary-foreground: 25 30% 30%;
  
-  /* Warm Gray/Beige for muted elements */
-  --muted: 30 20% 90%;
-  --muted-foreground: 25 5% 45%;
+  /* Muted Warm Gray */
+  --muted: 30 20% 94%;
+  --muted-foreground: 25 10% 55%;
  
-  /* Fresh Green for success/freshness */
-  --accent: 142 60% 95%;
-  --accent-foreground: 142 70% 30%;
+  /* Soft Mint Green */
+  --accent: 150 40% 94%;
+  --accent-foreground: 150 40% 30%;
  
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 60 9.1% 97.8%;
+  --destructive: 0 80% 65%;
+  --destructive-foreground: 0 0% 100%;
 
-  --border: 30 20% 85%;
-  --input: 30 20% 85%;
-  --ring: 25 95% 53%;
+  --border: 30 20% 92%;
+  --input: 30 20% 92%;
+  --ring: 18 90% 65%;
  
-  --radius: 0.75rem;
+  /* Chart colors - Pastel/Soft Food Tones */
+  --chart-1: 18 90% 65%; /* Coral */
+  --chart-2: 45 90% 70%; /* Honey */
+  --chart-3: 150 40% 60%; /* Sage */
+  --chart-4: 340 70% 75%; /* Berry */
+  --chart-5: 200 60% 70%; /* Sky */
   
-  /* Chart colors fitting the food theme */
-  --chart-1: 25 95% 53%; /* Orange */
-  --chart-2: 10 80% 55%; /* Red */
-  --chart-3: 142 60% 45%; /* Green */
-  --chart-4: 45 90% 55%; /* Mustard/Yellow */
-  --chart-5: 20 40% 30%; /* Brown */
-  
-  --sidebar: 36 30% 96%;
-  --sidebar-foreground: 20 14% 4%;
-  --sidebar-primary: 25 95% 53%;
-  --sidebar-primary-foreground: 60 9.1% 97.8%;
-  --sidebar-accent: 30 30% 92%;
-  --sidebar-accent-foreground: 25 95% 53%;
-  --sidebar-border: 30 20% 88%;
-  --sidebar-ring: 25 95% 53%;
+  --sidebar: 36 30% 98%;
+  --sidebar-foreground: 20 10% 20%;
+  --sidebar-primary: 18 90% 65%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 36 50% 94%;
+  --sidebar-accent-foreground: 25 30% 30%;
+  --sidebar-border: 30 20% 94%;
+  --sidebar-ring: 18 90% 65%;
 }
 
 .dark {
-  /* Dark Chocolate / Late Night Diner vibe */
-  --background: 20 14% 8%;
+  /* Dark Chocolate / Warm Night */
+  --background: 25 15% 10%;
   --foreground: 36 30% 96%;
  
-  --card: 20 14% 10%;
+  --card: 25 15% 13%;
   --card-foreground: 36 30% 96%;
  
-  --popover: 20 14% 10%;
+  --popover: 25 15% 13%;
   --popover-foreground: 36 30% 96%;
  
-  --primary: 25 95% 53%;
-  --primary-foreground: 60 9.1% 97.8%;
+  --primary: 18 80% 65%;
+  --primary-foreground: 0 0% 100%;
  
-  --secondary: 20 14% 16%;
+  --secondary: 25 15% 18%;
   --secondary-foreground: 36 30% 96%;
  
-  --muted: 20 14% 16%;
-  --muted-foreground: 30 10% 65%;
+  --muted: 25 15% 18%;
+  --muted-foreground: 30 10% 70%;
  
-  --accent: 20 14% 16%;
+  --accent: 25 15% 18%;
   --accent-foreground: 36 30% 96%;
  
-  --destructive: 0 62.8% 30.6%;
+  --destructive: 0 60% 40%;
   --destructive-foreground: 36 30% 96%;
  
-  --border: 20 14% 16%;
-  --input: 20 14% 16%;
-  --ring: 25 95% 53%;
+  --border: 25 15% 18%;
+  --input: 25 15% 18%;
+  --ring: 18 80% 65%;
   
-  --chart-1: 25 95% 53%;
-  --chart-2: 10 80% 55%;
-  --chart-3: 142 60% 45%;
-  --chart-4: 45 90% 55%;
-  --chart-5: 36 30% 96%;
+  --chart-1: 18 80% 65%;
+  --chart-2: 45 80% 60%;
+  --chart-3: 150 40% 50%;
+  --chart-4: 340 60% 65%;
+  --chart-5: 200 50% 60%;
   
-  --sidebar: 20 14% 8%;
+  --sidebar: 25 15% 10%;
   --sidebar-foreground: 36 30% 96%;
-  --sidebar-primary: 25 95% 53%;
-  --sidebar-primary-foreground: 60 9.1% 97.8%;
-  --sidebar-accent: 20 14% 16%;
+  --sidebar-primary: 18 80% 65%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 25 15% 18%;
   --sidebar-accent-foreground: 36 30% 96%;
-  --sidebar-border: 20 14% 16%;
-  --sidebar-ring: 25 95% 53%;
+  --sidebar-border: 25 15% 18%;
+  --sidebar-ring: 18 80% 65%;
 }
 
 @layer base {
@@ -172,5 +173,10 @@
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading font-bold text-foreground;
+  }
+  
+  /* Global smooth transitions */
+  button, a, input, .card {
+    @apply transition-all duration-300 ease-out;
   }
 }
