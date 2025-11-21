@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
-import { Home, Map, Users, User, MessageCircle } from "lucide-react";
+import { Home, Map, Users, User, MessageCircle, Plus, Camera } from "lucide-react";
 import { ASSETS } from "@/lib/mockData";
+import { Button } from "@/components/ui/button";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -8,10 +9,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const navItems = [
     { href: "/", icon: Home, label: "Home" },
     { href: "/social", icon: MessageCircle, label: "Social" },
+    // Middle slot reserved for Post button on mobile
     { href: "/history", icon: Map, label: "History" },
-    { href: "/club", icon: Users, label: "Club" },
     { href: "/profile", icon: User, label: "Me" },
   ];
+
+  // Split items for mobile layout (2 on left, 2 on right)
+  const mobileNavLeft = navItems.slice(0, 2);
+  const mobileNavRight = navItems.slice(2);
 
   return (
     <div className="min-h-screen bg-background font-sans flex flex-col md:flex-row max-w-screen-2xl mx-auto overflow-hidden">
@@ -26,7 +31,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             </div>
 
-            <nav className="flex-1 space-y-1">
+            {/* Desktop Post Button */}
+            <div className="mb-6 hidden lg:block">
+                <Button className="w-full rounded-2xl font-bold shadow-soft hover:shadow-lg hover:-translate-y-1 transition-all bg-primary text-white h-12">
+                    <Plus className="w-5 h-5 mr-2" /> New Post
+                </Button>
+            </div>
+            <div className="mb-6 lg:hidden flex justify-center">
+                <Button size="icon" className="rounded-2xl font-bold shadow-soft bg-primary text-white h-10 w-10">
+                    <Plus className="w-5 h-5" />
+                </Button>
+            </div>
+
+            <nav className="flex-1 space-y-2">
             {navItems.map((item) => {
                 const isActive = location === item.href;
                 return (
@@ -35,12 +52,21 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                         ? "bg-white shadow-sm text-primary" 
                         : "text-muted-foreground hover:bg-white/60 hover:text-foreground"
                     }`}>
-                    <item.icon className={`w-5 h-5 ${isActive ? "fill-current" : "group-hover:scale-110 transition-transform"}`} strokeWidth={2.5} />
+                    <item.icon className={`w-6 h-6 lg:w-5 lg:h-5 ${isActive ? "fill-current" : "group-hover:scale-110 transition-transform"}`} strokeWidth={2.5} />
                     <span className="hidden lg:block">{item.label}</span>
                     {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full lg:hidden" />}
                 </Link>
                 );
             })}
+            {/* Add Club Link Explicitly for Desktop if not in main items */}
+            <Link href="/club" className={`flex items-center justify-center lg:justify-start gap-3 px-3 py-3 rounded-2xl transition-all duration-300 font-medium group relative ${
+                    location === "/club" 
+                        ? "bg-white shadow-sm text-primary" 
+                        : "text-muted-foreground hover:bg-white/60 hover:text-foreground"
+                    }`}>
+                <Users className={`w-6 h-6 lg:w-5 lg:h-5 ${location === "/club" ? "fill-current" : "group-hover:scale-110 transition-transform"}`} strokeWidth={2.5} />
+                <span className="hidden lg:block">Club</span>
+            </Link>
             </nav>
 
             <div className="mt-auto pt-6 border-t border-border/50 hidden lg:block">
@@ -59,30 +85,60 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
            <img src={ASSETS.mascot} alt="Mascot" className="w-8 h-8 object-contain" />
            <span className="font-heading font-bold text-lg text-foreground/90">Restaurant Club</span>
         </div>
-        <button className="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center text-foreground/80">
-          <User className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-3">
+            {/* Header Post Button for quick access */}
+            <button className="w-9 h-9 rounded-full bg-primary text-white shadow-sm flex items-center justify-center active:scale-95 transition-transform">
+                <Plus className="w-5 h-5" />
+            </button>
+            <button className="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center text-foreground/80">
+                <User className="w-4 h-4" />
+            </button>
+        </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 w-full pb-24 md:pb-0 overflow-x-hidden">
+      <main className="flex-1 w-full pb-28 md:pb-0 overflow-x-hidden">
         <div className="container mx-auto max-w-5xl p-4 md:p-8 animate-in fade-in zoom-in-95 duration-700 ease-out">
           {children}
         </div>
       </main>
 
-      {/* Mobile Bottom Nav */}
-      <nav className="md:hidden fixed bottom-4 left-4 right-4 bg-white/90 backdrop-blur-xl border border-white/50 shadow-float rounded-full px-6 py-3 flex justify-between items-center z-50">
-        {navItems.map((item) => {
-          const isActive = location === item.href;
-          return (
-            <Link key={item.href} href={item.href} className={`flex flex-col items-center justify-center w-12 h-12 rounded-full transition-all duration-300 ${
-                isActive ? "bg-primary/10 text-primary scale-110" : "text-muted-foreground hover:text-foreground"
-              }`}>
-                <item.icon className={`w-5 h-5 ${isActive ? "fill-current" : ""}`} strokeWidth={2.5} />
-            </Link>
-          );
-        })}
+      {/* Mobile Bottom Nav - Curve Style */}
+      <nav className="md:hidden fixed bottom-6 left-4 right-4 z-50">
+        <div className="absolute inset-0 bg-white/90 backdrop-blur-xl border border-white/50 shadow-float rounded-[2.5rem]" />
+        
+        <div className="relative flex justify-between items-center px-2 py-2">
+            {/* Left Items */}
+            {mobileNavLeft.map((item) => {
+                const isActive = location === item.href;
+                return (
+                <Link key={item.href} href={item.href} className={`flex-1 flex flex-col items-center justify-center py-2 rounded-2xl transition-all duration-300 ${
+                    isActive ? "text-primary scale-105" : "text-muted-foreground active:scale-95"
+                }`}>
+                    <item.icon className={`w-6 h-6 ${isActive ? "fill-current" : ""}`} strokeWidth={2.5} />
+                </Link>
+                );
+            })}
+
+            {/* Center Action Button (Floating) */}
+            <div className="relative -top-8">
+                <button className="w-16 h-16 rounded-full bg-primary text-white shadow-lg shadow-primary/30 flex items-center justify-center transform transition-transform active:scale-95 border-4 border-background">
+                    <Camera className="w-7 h-7" />
+                </button>
+            </div>
+
+            {/* Right Items */}
+            {mobileNavRight.map((item) => {
+                const isActive = location === item.href;
+                return (
+                <Link key={item.href} href={item.href} className={`flex-1 flex flex-col items-center justify-center py-2 rounded-2xl transition-all duration-300 ${
+                    isActive ? "text-primary scale-105" : "text-muted-foreground active:scale-95"
+                }`}>
+                    <item.icon className={`w-6 h-6 ${isActive ? "fill-current" : ""}`} strokeWidth={2.5} />
+                </Link>
+                );
+            })}
+        </div>
       </nav>
     </div>
   );
