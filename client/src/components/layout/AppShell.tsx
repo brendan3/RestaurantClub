@@ -89,7 +89,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Mobile Header */}
-      <header className="md:hidden sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-white/20 px-4 py-3 flex items-center justify-between" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
+      <header className="md:hidden sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-white/20 px-4 flex items-center justify-between" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)', paddingBottom: '0.75rem' }}>
         <div className="flex items-center gap-2">
            <img src={ASSETS.mascot} alt="Mascot" className="w-8 h-8 object-contain" />
            <span className="font-heading font-bold text-lg text-foreground/90">Restaurant Club</span>
