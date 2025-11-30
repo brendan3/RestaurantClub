@@ -17,6 +17,7 @@ function Router() {
     <AppShell>
       <Switch>
         <Route path="/" component={Dashboard} />
+        <Route path="/dashboard" component={Dashboard} />
         <Route path="/social" component={Social} />
         <Route path="/history" component={History} />
         <Route path="/club" component={Club} />

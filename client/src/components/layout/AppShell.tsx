@@ -2,9 +2,18 @@ import { Link, useLocation } from "wouter";
 import { Home, Map, Users, User, MessageCircle, Plus, Camera } from "lucide-react";
 import { ASSETS } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
+  const { toast } = useToast();
+
+  const handleComingSoon = (feature: string) => {
+    toast({
+      title: "Coming Soon! 🚀",
+      description: `${feature} will be available in the next update.`,
+    });
+  };
 
   const navItems = [
     { href: "/", icon: Home, label: "Home" },
@@ -31,14 +40,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             </div>
 
-            {/* Desktop Post Button */}
+            {/* Desktop Add Event Button */}
             <div className="mb-6 hidden lg:block">
-                <Button className="w-full rounded-2xl font-bold shadow-soft hover:shadow-lg hover:-translate-y-1 transition-all bg-primary text-white h-12">
-                    <Plus className="w-5 h-5 mr-2" /> New Post
+                <Button onClick={() => handleComingSoon("Add Event")} className="w-full rounded-2xl font-bold shadow-soft hover:shadow-lg hover:-translate-y-1 transition-all bg-primary text-white h-12">
+                    <Plus className="w-5 h-5 mr-2" /> Add Event
                 </Button>
             </div>
             <div className="mb-6 lg:hidden flex justify-center">
-                <Button size="icon" className="rounded-2xl font-bold shadow-soft bg-primary text-white h-10 w-10">
+                <Button onClick={() => handleComingSoon("Add Event")} size="icon" className="rounded-2xl font-bold shadow-soft bg-primary text-white h-10 w-10">
                     <Plus className="w-5 h-5" />
                 </Button>
             </div>
@@ -80,14 +89,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Mobile Header */}
-      <header className="md:hidden sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-white/20 px-4 py-3 flex items-center justify-between">
+      <header className="md:hidden sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-white/20 px-4 py-3 flex items-center justify-between" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
         <div className="flex items-center gap-2">
            <img src={ASSETS.mascot} alt="Mascot" className="w-8 h-8 object-contain" />
            <span className="font-heading font-bold text-lg text-foreground/90">Restaurant Club</span>
         </div>
         <div className="flex items-center gap-3">
-            {/* Header Post Button for quick access */}
-            <button className="w-9 h-9 rounded-full bg-primary text-white shadow-sm flex items-center justify-center active:scale-95 transition-transform">
+            {/* Header Add Button */}
+            <button onClick={() => handleComingSoon("Add Event")} className="w-9 h-9 rounded-full bg-primary text-white shadow-sm flex items-center justify-center active:scale-95 transition-transform">
                 <Plus className="w-5 h-5" />
             </button>
             <Link href="/profile">
@@ -99,14 +108,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 w-full pb-28 md:pb-0 overflow-x-hidden">
-        <div className="container mx-auto max-w-5xl p-4 md:p-8 animate-in fade-in zoom-in-95 duration-700 ease-out">
+      <main className="flex-1 w-full pb-32 md:pb-0 overflow-x-hidden" style={{ paddingBottom: 'max(8rem, calc(env(safe-area-inset-bottom) + 8rem))' }}>
+        <div className="container mx-auto max-w-5xl p-4 md:p-8 pt-4 md:pt-8 animate-in fade-in zoom-in-95 duration-700 ease-out">
           {children}
         </div>
       </main>
 
       {/* Mobile Bottom Nav - Curve Style */}
-      <nav className="md:hidden fixed bottom-6 left-4 right-4 z-50">
+      <nav className="md:hidden fixed left-4 right-4 z-50" style={{ bottom: 'max(1.5rem, calc(env(safe-area-inset-bottom) + 1rem))' }}>
         <div className="absolute inset-0 bg-white/90 backdrop-blur-xl border border-white/50 shadow-float rounded-[2.5rem]" />
         
         <div className="relative flex justify-between items-center px-2 py-2">
@@ -124,7 +133,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
             {/* Center Action Button (Floating) */}
             <div className="relative -top-8">
-                <button className="w-16 h-16 rounded-full bg-primary text-white shadow-lg shadow-primary/30 flex items-center justify-center transform transition-transform active:scale-95 border-4 border-background">
+                <button onClick={() => handleComingSoon("Photo Upload")} className="w-16 h-16 rounded-full bg-primary text-white shadow-lg shadow-primary/30 flex items-center justify-center transform transition-transform active:scale-95 border-4 border-background">
                     <Camera className="w-7 h-7" />
                 </button>
             </div>
