@@ -1,10 +1,11 @@
-import { getDb } from "./db";
+import { db, pool } from "./db"; // <-- FIX 1: Import db and pool directly
 import { users, clubs, clubMembers, events, eventAttendees, eventTags } from "@shared/schema";
 
 async function seed() {
-  const db = getDb();
-  
+  // const db = getDb(); // <-- DELETED: getDb is no longer exported by db.ts
+
   if (!db) {
+    // Note: With the new db.ts logic, this check might be redundant, but we'll keep it as a safeguard.
     console.error("❌ DATABASE_URL not set. Cannot seed database.");
     process.exit(1);
   }
@@ -12,6 +13,8 @@ async function seed() {
   console.log("🌱 Seeding database...");
 
   try {
+    // --- Original Insert Logic ---
+
     // Create users
     const [alex, sarah, mike, jessica, david] = await db.insert(users).values([
       {
@@ -142,6 +145,9 @@ async function seed() {
     console.log("\nTest user credentials:");
     console.log("  Username: alex");
     console.log("  Password: password123");
+
+    // --- FIX 2: Close the connection pool ---
+    await pool.end(); 
     
   } catch (error) {
     console.error("❌ Seed failed:", error);
@@ -150,4 +156,3 @@ async function seed() {
 }
 
 seed();
-
