@@ -1,5 +1,5 @@
 import { eq, desc, asc, and } from "drizzle-orm";
-import { getDb } from "./db";
+import { db } from "./db"; // <-- FIX 1: Import 'db' directly (not getDb)
 import { 
   users, events, clubs, clubMembers, eventAttendees, eventTags,
   type User, type InsertUser, type Event, type Club 
@@ -7,44 +7,44 @@ import {
 import type { IStorage } from "./storage";
 
 export class DatabaseStorage implements IStorage {
-  private db = getDb();
+  // private db = getDb(); <-- DELETE: No longer needed. Use imported 'db' instead.
 
   async getUser(id: string): Promise<User | undefined> {
-    if (!this.db) return undefined;
-    const result = await this.db.select().from(users).where(eq(users.id, id)).limit(1);
+    // if (!this.db) return undefined; <-- DELETE: No longer needed as 'db' is always imported.
+    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
     return result[0];
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    if (!this.db) return undefined;
-    const result = await this.db.select().from(users).where(eq(users.username, username)).limit(1);
+    // if (!this.db) return undefined;
+    const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
     return result[0];
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    if (!this.db) throw new Error("Database not connected");
-    const result = await this.db.insert(users).values(insertUser).returning();
+    // if (!this.db) throw new Error("Database not connected");
+    const result = await db.insert(users).values(insertUser).returning();
     return result[0];
   }
 
   async getEvents(clubId?: string): Promise<Event[]> {
-    if (!this.db) return [];
+    // if (!this.db) return [];
     
     const query = clubId 
-      ? this.db.select().from(events).where(eq(events.clubId, clubId)).orderBy(desc(events.eventDate))
-      : this.db.select().from(events).orderBy(desc(events.eventDate));
+      ? db.select().from(events).where(eq(events.clubId, clubId)).orderBy(desc(events.eventDate))
+      : db.select().from(events).orderBy(desc(events.eventDate));
     
     return await query;
   }
 
   async getUpcomingEvents(clubId?: string): Promise<Event[]> {
-    if (!this.db) return [];
+    // if (!this.db) return [];
     
     const conditions = clubId
       ? and(eq(events.status, "confirmed"), eq(events.clubId, clubId))
       : eq(events.status, "confirmed");
     
-    return await this.db
+    return await db
       .select()
       .from(events)
       .where(conditions!)
@@ -52,13 +52,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPastEvents(clubId?: string): Promise<Event[]> {
-    if (!this.db) return [];
+    // if (!this.db) return [];
     
     const conditions = clubId
       ? and(eq(events.status, "past"), eq(events.clubId, clubId))
       : eq(events.status, "past");
     
-    return await this.db
+    return await db
       .select()
       .from(events)
       .where(conditions!)
@@ -66,21 +66,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getEventById(id: string): Promise<Event | undefined> {
-    if (!this.db) return undefined;
-    const result = await this.db.select().from(events).where(eq(events.id, id)).limit(1);
+    // if (!this.db) return undefined;
+    const result = await db.select().from(events).where(eq(events.id, id)).limit(1);
     return result[0];
   }
 
   async createEvent(event: any): Promise<Event> {
-    if (!this.db) throw new Error("Database not connected");
-    const result = await this.db.insert(events).values(event).returning();
+    // if (!this.db) throw new Error("Database not connected");
+    const result = await db.insert(events).values(event).returning();
     return result[0];
   }
 
   async getUserClubs(userId: string): Promise<Club[]> {
-    if (!this.db) return [];
+    // if (!this.db) return [];
     
-    const result = await this.db
+    const result = await db
       .select({
         id: clubs.id,
         name: clubs.name,
@@ -95,8 +95,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getClubById(id: string): Promise<Club | undefined> {
-    if (!this.db) return undefined;
-    const result = await this.db.select().from(clubs).where(eq(clubs.id, id)).limit(1);
+    // if (!this.db) return undefined;
+    const result = await db.select().from(clubs).where(eq(clubs.id, id)).limit(1);
     return result[0];
   }
 
@@ -106,12 +106,12 @@ export class DatabaseStorage implements IStorage {
     totalDinners: number;
     avgBill: number;
   }> {
-    if (!this.db) {
-      return { attendance: 0, avgRating: 0, totalDinners: 0, avgBill: 0 };
-    }
+    // if (!this.db) { // No need for this check if db is guaranteed to be connected.
+    //   return { attendance: 0, avgRating: 0, totalDinners: 0, avgBill: 0 };
+    // }
 
     // Get total dinners user attended
-    const attendedEvents = await this.db
+    const attendedEvents = await db
       .select()
       .from(eventAttendees)
       .where(eq(eventAttendees.userId, userId));
@@ -126,7 +126,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     // Simple calculation for now - can be improved
-    const pastEventsAttended = await this.db
+    const pastEventsAttended = await db
       .select()
       .from(events)
       .where(eq(events.status, "past"));
@@ -150,4 +150,3 @@ export class DatabaseStorage implements IStorage {
     };
   }
 }
-
