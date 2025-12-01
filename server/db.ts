@@ -1,9 +1,10 @@
-import { drizzle } from "drizzle-orm/neon-http";
-import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import * as schema from "@shared/schema";
 
 // Database connection
 let db: ReturnType<typeof drizzle> | null = null;
+let pool: Pool | null = null;
 
 export function getDb() {
   if (db) return db;
@@ -16,13 +17,26 @@ export function getDb() {
   }
 
   try {
-    const sql = neon(connectionString);
-    db = drizzle(sql, { schema });
+    pool = new Pool({
+      connectionString,
+      ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+    });
+    
+    db = drizzle(pool, { schema });
     console.log("✅ Database connected");
     return db;
   } catch (error) {
     console.error("❌ Database connection failed:", error);
     return null;
+  }
+}
+
+// Clean up function
+export async function closeDb() {
+  if (pool) {
+    await pool.end();
+    pool = null;
+    db = null;
   }
 }
 
