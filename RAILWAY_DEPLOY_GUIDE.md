@@ -263,6 +263,22 @@ iPhone App → Vercel Frontend → Railway Backend → PostgreSQL Database
 
 ## 🐛 Troubleshooting
 
+### ESM Import Error for `pg`
+
+**Error**: `SyntaxError: Named export 'Pool' not found. The requested module 'pg' is a CommonJS module`
+**Fix**: 
+- The `pg` package is CommonJS and needs a default import in ESM
+- We use: `import pg from "pg"; const { Pool } = pg;`
+- This is already fixed in `server/db.ts`
+
+### Node Version Warning
+
+**Error**: `You are using Node.js X.X.X. Vite requires Node.js version 20.19+ or 22.12+`
+**Fix**:
+- Ensure `.nvmrc` contains `22.12.0` or higher
+- Ensure `package.json` has `"engines": { "node": ">=22.12.0" }`
+- Railway will auto-detect and use the correct version
+
 ### Build Fails
 
 **Error**: Dependencies not installing

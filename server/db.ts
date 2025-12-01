@@ -1,6 +1,9 @@
 import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import pg from "pg";
 import * as schema from "@shared/schema";
+
+// CommonJS default import workaround for ESM + esbuild
+const { Pool } = pg;
 
 // Database connection
 let db: ReturnType<typeof drizzle> | null = null;
