@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import { type Request, type Response, type NextFunction } from "express";
 import { storage } from "./storage";
 import { signupSchema, loginSchema, type User } from "@shared/schema";
@@ -7,6 +8,12 @@ import { signupSchema, loginSchema, type User } from "@shared/schema";
 // JWT secret - in production, this should be an environment variable
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
 const JWT_EXPIRES_IN = "7d";
+const VERIFICATION_TOKEN_EXPIRY_HOURS = 1;
+
+// Generate a secure random verification token
+function generateVerificationToken(): string {
+  return crypto.randomBytes(32).toString("hex");
+}
 
 // Extend Express Request to include user
 declare global {
@@ -124,7 +131,13 @@ export async function signup(req: Request, res: Response) {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Create user
+    // Generate verification token and expiry
+    const verificationToken = generateVerificationToken();
+    const verificationExpires = new Date(
+      Date.now() + VERIFICATION_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000
+    );
+
+    // Create user (not verified yet)
     const user = await storage.createUser({
       email,
       passwordHash,
@@ -133,20 +146,19 @@ export async function signup(req: Request, res: Response) {
       avatar: null,
     });
 
-    // Generate token
-    const token = generateToken(user);
+    // Update user with verification token
+    await storage.updateUserVerification(user.id, {
+      verificationToken,
+      verificationExpires,
+      emailVerified: false,
+    });
 
-    // Return user and token
+    // Return verification info (no token, user cannot log in yet)
+    // In production, we would send an email here
     res.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        username: user.username,
-        avatar: user.avatar,
-        memberSince: user.memberSince,
-      },
-      token,
+      needsVerification: true,
+      verifyUrl: `/verify-email?token=${verificationToken}`,
+      message: "Account created. Please verify your email to continue.",
     });
   } catch (error) {
     console.error("Signup error:", error);
@@ -178,6 +190,16 @@ export async function login(req: Request, res: Response) {
     const isValidPassword = await bcrypt.compare(password, user.passwordHash);
     if (!isValidPassword) {
       return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    // Check if email is verified
+    // Don't reveal whether password was correct if not verified
+    if (!user.emailVerified) {
+      return res.status(400).json({ 
+        error: "Email not verified",
+        needsVerification: true,
+        email: user.email,
+      });
     }
 
     // Generate token
@@ -237,6 +259,93 @@ export async function getCurrentUser(req: Request, res: Response) {
   } catch (error) {
     console.error("Get current user error:", error);
     res.status(500).json({ error: "Failed to get user" });
+  }
+}
+
+// Verify email handler
+export async function verifyEmail(req: Request, res: Response) {
+  try {
+    const { token } = req.body;
+
+    if (!token || typeof token !== "string") {
+      return res.status(400).json({ error: "Token is required" });
+    }
+
+    // Find user by verification token
+    const user = await storage.getUserByVerificationToken(token);
+    
+    if (!user) {
+      return res.status(400).json({ error: "Invalid or expired token" });
+    }
+
+    // Check if token has expired
+    if (user.verificationExpires && new Date() > user.verificationExpires) {
+      return res.status(400).json({ error: "Invalid or expired token" });
+    }
+
+    // Mark email as verified and clear token
+    await storage.updateUserVerification(user.id, {
+      emailVerified: true,
+      verificationToken: null,
+      verificationExpires: null,
+    });
+
+    res.json({ 
+      verified: true,
+      message: "Email verified successfully. You may now log in.",
+    });
+  } catch (error) {
+    console.error("Verify email error:", error);
+    res.status(500).json({ error: "Failed to verify email" });
+  }
+}
+
+// Resend verification email handler (stub)
+export async function resendVerification(req: Request, res: Response) {
+  try {
+    const { email } = req.body;
+
+    if (!email || typeof email !== "string") {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    // Find user by email
+    const user = await storage.getUserByEmail(email);
+    
+    if (!user) {
+      // Don't reveal if user exists or not
+      return res.json({ 
+        message: "If an account exists with this email, a verification link will be sent.",
+      });
+    }
+
+    if (user.emailVerified) {
+      return res.json({ 
+        message: "Email is already verified. You can log in.",
+      });
+    }
+
+    // Generate new verification token
+    const verificationToken = generateVerificationToken();
+    const verificationExpires = new Date(
+      Date.now() + VERIFICATION_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000
+    );
+
+    await storage.updateUserVerification(user.id, {
+      verificationToken,
+      verificationExpires,
+    });
+
+    // In production, send email here
+    // For now, return the verification URL
+    res.json({ 
+      message: "If an account exists with this email, a verification link will be sent.",
+      // DEV ONLY: Include the verify URL for testing
+      verifyUrl: `/verify-email?token=${verificationToken}`,
+    });
+  } catch (error) {
+    console.error("Resend verification error:", error);
+    res.status(500).json({ error: "Failed to resend verification" });
   }
 }
 

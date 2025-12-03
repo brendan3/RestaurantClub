@@ -7,7 +7,13 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByVerificationToken(token: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUserVerification(userId: string, data: {
+    emailVerified?: boolean;
+    verificationToken?: string | null;
+    verificationExpires?: Date | null;
+  }): Promise<User>;
   
   // Event methods
   getEvents(clubId?: string): Promise<Event[]>;
@@ -60,16 +66,43 @@ export class MemStorage implements IStorage {
     );
   }
 
+  async getUserByVerificationToken(token: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      (user) => user.verificationToken === token,
+    );
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
     const user: User = { 
       ...insertUser, 
       id,
       memberSince: new Date(),
-      avatar: insertUser.avatar || null
+      avatar: insertUser.avatar || null,
+      emailVerified: false,
+      verificationToken: null,
+      verificationExpires: null,
+      updatedAt: new Date(),
     };
     this.users.set(id, user);
     return user;
+  }
+
+  async updateUserVerification(userId: string, data: {
+    emailVerified?: boolean;
+    verificationToken?: string | null;
+    verificationExpires?: Date | null;
+  }): Promise<User> {
+    const user = this.users.get(userId);
+    if (!user) throw new Error("User not found");
+    
+    const updatedUser = {
+      ...user,
+      ...data,
+      updatedAt: new Date(),
+    };
+    this.users.set(userId, updatedUser);
+    return updatedUser;
   }
 
   // Event methods - will be replaced with DB queries

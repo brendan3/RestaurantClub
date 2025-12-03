@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { login, signup } from "@/lib/api";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { login, signup, resendVerification } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
+import { Mail, CheckCircle, AlertCircle } from "lucide-react";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -17,15 +19,24 @@ export default function Login() {
   // Login form state
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState("");
 
   // Signup form state
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupName, setSignupName] = useState("");
+  
+  // Signup success state
+  const [signupSuccess, setSignupSuccess] = useState(false);
+  const [verifyUrl, setVerifyUrl] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setLoginError(null);
+    setNeedsVerification(false);
 
     try {
       const response = await login(loginEmail, loginPassword);
@@ -33,7 +44,15 @@ export default function Login() {
       toast.success("Welcome back!");
       setLocation("/");
     } catch (error: any) {
-      toast.error(error.message || "Failed to login");
+      // Check if the error is about email verification
+      if (error.message === "Email not verified") {
+        setNeedsVerification(true);
+        setUnverifiedEmail(loginEmail);
+        setLoginError("You must verify your email before logging in.");
+      } else {
+        setLoginError(error.message || "Failed to login");
+        toast.error(error.message || "Failed to login");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -45,15 +64,93 @@ export default function Login() {
 
     try {
       const response = await signup(signupEmail, signupPassword, signupName);
-      setUser(response.user);
-      toast.success("Account created successfully!");
-      setLocation("/");
+      
+      // Show verification needed UI
+      setSignupSuccess(true);
+      setVerifyUrl(response.verifyUrl);
+      toast.success("Account created! Please verify your email.");
     } catch (error: any) {
       toast.error(error.message || "Failed to create account");
     } finally {
       setIsLoading(false);
     }
   };
+
+  const handleResendVerification = async () => {
+    setIsLoading(true);
+    try {
+      const response = await resendVerification(unverifiedEmail || signupEmail);
+      if (response.verifyUrl) {
+        setVerifyUrl(response.verifyUrl);
+      }
+      toast.success("Verification email sent!");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to resend verification");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Show signup success / verification needed screen
+  if (signupSuccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-red-50 p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+              <Mail className="w-8 h-8 text-green-600" />
+            </div>
+            <CardTitle className="text-2xl font-bold">Check Your Email</CardTitle>
+            <CardDescription>
+              We've sent a verification link to <strong>{signupEmail}</strong>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert>
+              <CheckCircle className="h-4 w-4" />
+              <AlertTitle>Account Created!</AlertTitle>
+              <AlertDescription>
+                Please verify your email address to continue. Check your inbox for a verification link.
+              </AlertDescription>
+            </Alert>
+            
+            {/* DEV: Direct verify link for testing */}
+            {verifyUrl && (
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800 font-medium mb-2">
+                  🧪 Development Mode: Click below to verify
+                </p>
+                <Button asChild variant="outline" className="w-full">
+                  <Link href={verifyUrl}>Verify Email Now</Link>
+                </Button>
+              </div>
+            )}
+
+            <div className="text-center space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Didn't receive the email?
+              </p>
+              <Button 
+                variant="ghost" 
+                onClick={handleResendVerification}
+                disabled={isLoading}
+              >
+                {isLoading ? "Sending..." : "Resend Verification Email"}
+              </Button>
+            </div>
+
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={() => setSignupSuccess(false)}
+            >
+              Back to Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-red-50 p-4">
@@ -71,6 +168,40 @@ export default function Login() {
 
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4">
+                {/* Email not verified warning */}
+                {needsVerification && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Email Not Verified</AlertTitle>
+                    <AlertDescription className="space-y-2">
+                      <p>{loginError}</p>
+                      <div className="flex gap-2 mt-2">
+                        <Button 
+                          type="button"
+                          variant="outline" 
+                          size="sm"
+                          onClick={handleResendVerification}
+                          disabled={isLoading}
+                        >
+                          Resend Email
+                        </Button>
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Show verify URL if resent */}
+                {needsVerification && verifyUrl && (
+                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-xs text-yellow-800 font-medium mb-2">
+                      🧪 Dev: Click to verify
+                    </p>
+                    <Button asChild variant="outline" size="sm" className="w-full">
+                      <Link href={verifyUrl}>Verify Email</Link>
+                    </Button>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label htmlFor="login-email">Email</Label>
                   <Input

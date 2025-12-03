@@ -75,22 +75,37 @@ export interface AuthResponse {
   token: string;
 }
 
+export interface SignupResponse {
+  needsVerification: true;
+  verifyUrl: string;
+  message: string;
+}
+
+export interface VerifyEmailResponse {
+  verified: boolean;
+  message: string;
+}
+
+export interface ResendVerificationResponse {
+  message: string;
+  verifyUrl?: string; // DEV only
+}
+
 // ============================================
 // AUTH FUNCTIONS
 // ============================================
 
 /**
  * Sign up a new user
+ * Returns verification info instead of logging in
  */
-export async function signup(email: string, password: string, name: string): Promise<AuthResponse> {
-  const response = await apiRequest<AuthResponse>("/api/auth/signup", {
+export async function signup(email: string, password: string, name: string): Promise<SignupResponse> {
+  const response = await apiRequest<SignupResponse>("/api/auth/signup", {
     method: "POST",
     body: JSON.stringify({ email, password, name }),
   });
   
-  // Store the token
-  setAuthToken(response.token);
-  
+  // Don't store token - user needs to verify email first
   return response;
 }
 
@@ -126,6 +141,26 @@ export async function logout(): Promise<void> {
  */
 export function isAuthenticated(): boolean {
   return !!getAuthToken();
+}
+
+/**
+ * Verify email with token
+ */
+export async function verifyEmail(token: string): Promise<VerifyEmailResponse> {
+  return apiRequest<VerifyEmailResponse>("/api/auth/verify-email", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+}
+
+/**
+ * Resend verification email
+ */
+export async function resendVerification(email: string): Promise<ResendVerificationResponse> {
+  return apiRequest<ResendVerificationResponse>("/api/auth/resend-verification", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
 }
 
 // ============================================

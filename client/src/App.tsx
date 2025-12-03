@@ -14,6 +14,7 @@ import Social from "@/pages/Social";
 import CreateClub from "@/pages/CreateClub";
 import EventDetail from "@/pages/EventDetail";
 import Login from "@/pages/Login";
+import VerifyEmail from "@/pages/VerifyEmail";
 import AppShell from "@/components/layout/AppShell";
 
 function ProtectedRoute({ component: Component }: { component: () => JSX.Element }) {
@@ -45,6 +46,10 @@ function Router() {
     <Switch>
       <Route path="/login">
         {isAuthenticated ? <Redirect to="/" /> : <Login />}
+      </Route>
+      
+      <Route path="/verify-email">
+        <VerifyEmail />
       </Route>
       
       <Route path="/">

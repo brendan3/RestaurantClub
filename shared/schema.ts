@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -11,6 +11,9 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   username: text("username"), // Optional display name
   avatar: text("avatar"),
+  emailVerified: boolean("email_verified").default(false),
+  verificationToken: text("verification_token"),
+  verificationExpires: timestamp("verification_expires"),
   memberSince: timestamp("member_since").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

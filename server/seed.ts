@@ -15,6 +15,7 @@ async function seed() {
     const passwordHash = await bcrypt.hash("password123", 10);
 
     // Create users with new schema (email, passwordHash)
+    // Seed users are pre-verified so they can log in without email verification
     const [alex, sarah, mike, jessica, david] = await db.insert(users).values([
       {
         email: "alex@example.com",
@@ -22,6 +23,7 @@ async function seed() {
         name: "Alex Chen",
         username: "alex",
         avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alex",
+        emailVerified: true,
       },
       {
         email: "sarah@example.com",
@@ -29,6 +31,7 @@ async function seed() {
         name: "Sarah Johnson",
         username: "sarah",
         avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah",
+        emailVerified: true,
       },
       {
         email: "mike@example.com",
@@ -36,6 +39,7 @@ async function seed() {
         name: "Mike Rodriguez",
         username: "mike",
         avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Mike",
+        emailVerified: true,
       },
       {
         email: "jessica@example.com",
@@ -43,6 +47,7 @@ async function seed() {
         name: "Jessica Lee",
         username: "jessica",
         avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Jessica",
+        emailVerified: true,
       },
       {
         email: "david@example.com",
@@ -50,6 +55,7 @@ async function seed() {
         name: "David Kim",
         username: "david",
         avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=David",
+        emailVerified: true,
       },
     ]).returning();
 

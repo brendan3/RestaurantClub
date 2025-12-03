@@ -23,6 +23,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/signup", auth.signup);
   app.post("/api/auth/login", auth.login);
   app.post("/api/auth/logout", auth.logout);
+  app.post("/api/auth/verify-email", auth.verifyEmail);
+  app.post("/api/auth/resend-verification", auth.resendVerification);
   
   // Get current user (protected)
   app.get("/api/user/me", auth.requireAuth, auth.getCurrentUser);
