@@ -21,6 +21,11 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    return result[0];
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     // if (!this.db) throw new Error("Database not connected");
     const result = await db.insert(users).values(insertUser).returning();
@@ -97,6 +102,86 @@ export class DatabaseStorage implements IStorage {
   async getClubById(id: string): Promise<Club | undefined> {
     // if (!this.db) return undefined;
     const result = await db.select().from(clubs).where(eq(clubs.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createClub(clubData: any): Promise<Club> {
+    const result = await db.insert(clubs).values(clubData).returning();
+    return result[0];
+  }
+
+  async addClubMember(clubId: string, userId: string, role: string = "member"): Promise<void> {
+    await db.insert(clubMembers).values({
+      clubId,
+      userId,
+      role,
+    });
+  }
+
+  async getClubMembers(clubId: string): Promise<any[]> {
+    const result = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        username: users.username,
+        avatar: users.avatar,
+        role: clubMembers.role,
+        joinedAt: clubMembers.joinedAt,
+      })
+      .from(clubMembers)
+      .innerJoin(users, eq(clubMembers.userId, users.id))
+      .where(eq(clubMembers.clubId, clubId));
+    
+    return result;
+  }
+
+  async createRsvp(eventId: string, userId: string, status: string): Promise<void> {
+    await db.insert(eventAttendees).values({
+      eventId,
+      userId,
+      status,
+    });
+  }
+
+  async updateRsvp(eventId: string, userId: string, status: string): Promise<void> {
+    await db
+      .update(eventAttendees)
+      .set({ status, rsvpAt: new Date() })
+      .where(and(
+        eq(eventAttendees.eventId, eventId),
+        eq(eventAttendees.userId, userId)
+      ));
+  }
+
+  async getEventRsvps(eventId: string): Promise<any[]> {
+    const result = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        username: users.username,
+        avatar: users.avatar,
+        status: eventAttendees.status,
+        rsvpAt: eventAttendees.rsvpAt,
+      })
+      .from(eventAttendees)
+      .innerJoin(users, eq(eventAttendees.userId, users.id))
+      .where(eq(eventAttendees.eventId, eventId));
+    
+    return result;
+  }
+
+  async getUserRsvp(eventId: string, userId: string): Promise<any | undefined> {
+    const result = await db
+      .select()
+      .from(eventAttendees)
+      .where(and(
+        eq(eventAttendees.eventId, eventId),
+        eq(eventAttendees.userId, userId)
+      ))
+      .limit(1);
+    
     return result[0];
   }
 

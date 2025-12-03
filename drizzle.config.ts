@@ -1,15 +1,13 @@
+// drizzle.config.ts
+import "dotenv/config";
 import { defineConfig } from "drizzle-kit";
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL, ensure the database is provisioned");
-}
-
 export default defineConfig({
-  out: "./migrations",
-  schema: "./shared/schema.ts",
+  schema: "./shared/schema.ts",       // <- matches your repo structure
+  out: "./drizzle",                   // where migrations/meta will go
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL,
+    url: process.env.DATABASE_URL!,   // uses the .env you just fixed
   },
-  driver: "pg",
+  // NOTE: no `driver` field here – we let drizzle-kit choose the default
 });

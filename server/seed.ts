@@ -1,11 +1,9 @@
-import { db, pool } from "./db"; // <-- FIX 1: Import db and pool directly
+import { db, pool } from "./db";
 import { users, clubs, clubMembers, events, eventAttendees, eventTags } from "@shared/schema";
+import bcrypt from "bcryptjs";
 
 async function seed() {
-  // const db = getDb(); // <-- DELETED: getDb is no longer exported by db.ts
-
   if (!db) {
-    // Note: With the new db.ts logic, this check might be redundant, but we'll keep it as a safeguard.
     console.error("❌ DATABASE_URL not set. Cannot seed database.");
     process.exit(1);
   }
@@ -13,38 +11,44 @@ async function seed() {
   console.log("🌱 Seeding database...");
 
   try {
-    // --- Original Insert Logic ---
+    // Hash password for all test users
+    const passwordHash = await bcrypt.hash("password123", 10);
 
-    // Create users
+    // Create users with new schema (email, passwordHash)
     const [alex, sarah, mike, jessica, david] = await db.insert(users).values([
       {
+        email: "alex@example.com",
+        passwordHash,
+        name: "Alex Chen",
         username: "alex",
-        password: "password123", // In production, this should be hashed!
-        name: "Alex",
         avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alex",
       },
       {
+        email: "sarah@example.com",
+        passwordHash,
+        name: "Sarah Johnson",
         username: "sarah",
-        password: "password123",
-        name: "Sarah",
         avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah",
       },
       {
+        email: "mike@example.com",
+        passwordHash,
+        name: "Mike Rodriguez",
         username: "mike",
-        password: "password123",
-        name: "Mike",
         avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Mike",
       },
       {
+        email: "jessica@example.com",
+        passwordHash,
+        name: "Jessica Lee",
         username: "jessica",
-        password: "password123",
-        name: "Jessica",
         avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Jessica",
       },
       {
+        email: "david@example.com",
+        passwordHash,
+        name: "David Kim",
         username: "david",
-        password: "password123",
-        name: "David",
         avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=David",
       },
     ]).returning();
@@ -52,107 +56,136 @@ async function seed() {
     console.log("✅ Created 5 users");
 
     // Create a club
-    const [club] = await db.insert(clubs).values({
-      name: "Downtown Foodies",
-      type: "private",
-    }).returning();
+    const [restaurantClub] = await db.insert(clubs).values([
+      {
+        name: "The Restaurant Club",
+        type: "private",
+      },
+    ]).returning();
 
-    console.log("✅ Created club:", club.name);
+    console.log("✅ Created club:", restaurantClub.name);
 
-    // Add members to club
+    // Add members to the club
     await db.insert(clubMembers).values([
-      { clubId: club.id, userId: alex.id, role: "owner" },
-      { clubId: club.id, userId: sarah.id, role: "member" },
-      { clubId: club.id, userId: mike.id, role: "member" },
-      { clubId: club.id, userId: jessica.id, role: "member" },
-      { clubId: club.id, userId: david.id, role: "member" },
+      { clubId: restaurantClub.id, userId: alex.id, role: "owner" },
+      { clubId: restaurantClub.id, userId: sarah.id, role: "admin" },
+      { clubId: restaurantClub.id, userId: mike.id, role: "member" },
+      { clubId: restaurantClub.id, userId: jessica.id, role: "member" },
+      { clubId: restaurantClub.id, userId: david.id, role: "member" },
     ]);
 
     console.log("✅ Added 5 members to club");
 
     // Create events
-    const upcomingEvent = await db.insert(events).values({
-      clubId: club.id,
-      restaurantName: "La Trattoria",
-      cuisine: "Italian",
-      eventDate: new Date("2025-05-15T19:00:00"),
-      location: "123 Olive St, Downtown",
-      status: "confirmed",
-      pickerId: sarah.id,
-    }).returning();
+    const now = new Date();
+    const futureDate = new Date(now.getTime() + 12 * 24 * 60 * 60 * 1000); // 12 days from now
+    const pastDate1 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
+    const pastDate2 = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000); // 60 days ago
 
-    const pastEvent1 = await db.insert(events).values({
-      clubId: club.id,
-      restaurantName: "Sakura Sushi",
-      cuisine: "Japanese",
-      eventDate: new Date("2025-04-10T18:30:00"),
-      location: "456 Sushi Lane",
-      status: "past",
-      rating: 5,
-      totalBill: 250,
-      pickerId: mike.id,
-    }).returning();
+    const [upcomingEvent, pastEvent1, pastEvent2] = await db.insert(events).values([
+      {
+        clubId: restaurantClub.id,
+        restaurantName: "La Trattoria",
+        cuisine: "Italian",
+        eventDate: futureDate,
+        location: "123 Main St, New York, NY",
+        status: "confirmed",
+        pickerId: alex.id,
+        imageUrl: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1000&q=80",
+      },
+      {
+        clubId: restaurantClub.id,
+        restaurantName: "Sushi Paradise",
+        cuisine: "Japanese",
+        eventDate: pastDate1,
+        location: "456 Oak Ave, New York, NY",
+        status: "past",
+        rating: 5,
+        totalBill: 180,
+        pickerId: sarah.id,
+        imageUrl: "https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?auto=format&fit=crop&w=1000&q=80",
+      },
+      {
+        clubId: restaurantClub.id,
+        restaurantName: "The Golden Steak",
+        cuisine: "Steakhouse",
+        eventDate: pastDate2,
+        location: "789 Elm St, New York, NY",
+        status: "past",
+        rating: 4,
+        totalBill: 250,
+        pickerId: mike.id,
+        imageUrl: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1000&q=80",
+      },
+    ]).returning();
 
-    const pastEvent2 = await db.insert(events).values({
-      clubId: club.id,
-      restaurantName: "Burger & Barrel",
-      cuisine: "American",
-      eventDate: new Date("2025-03-12T19:00:00"),
-      location: "789 Burger Blvd",
-      status: "past",
-      rating: 4,
-      totalBill: 180,
-      pickerId: alex.id,
-    }).returning();
+    console.log("✅ Created 3 events (1 upcoming, 2 past)");
 
-    console.log("✅ Created 3 events");
-
-    // Add attendees to upcoming event
+    // Add RSVPs for upcoming event
     await db.insert(eventAttendees).values([
-      { eventId: upcomingEvent[0].id, userId: alex.id },
-      { eventId: upcomingEvent[0].id, userId: sarah.id },
-      { eventId: upcomingEvent[0].id, userId: mike.id },
-      { eventId: upcomingEvent[0].id, userId: david.id },
+      { eventId: upcomingEvent.id, userId: alex.id, status: "attending" },
+      { eventId: upcomingEvent.id, userId: sarah.id, status: "attending" },
+      { eventId: upcomingEvent.id, userId: mike.id, status: "maybe" },
+      { eventId: upcomingEvent.id, userId: jessica.id, status: "attending" },
     ]);
 
-    // Add attendees to past events
+    console.log("✅ Added RSVPs for upcoming event");
+
+    // Add RSVPs for past events
     await db.insert(eventAttendees).values([
-      { eventId: pastEvent1[0].id, userId: alex.id },
-      { eventId: pastEvent1[0].id, userId: sarah.id },
-      { eventId: pastEvent1[0].id, userId: jessica.id },
-      { eventId: pastEvent1[0].id, userId: david.id },
-      { eventId: pastEvent2[0].id, userId: alex.id },
-      { eventId: pastEvent2[0].id, userId: sarah.id },
-      { eventId: pastEvent2[0].id, userId: mike.id },
-      { eventId: pastEvent2[0].id, userId: jessica.id },
+      { eventId: pastEvent1.id, userId: alex.id, status: "attending" },
+      { eventId: pastEvent1.id, userId: sarah.id, status: "attending" },
+      { eventId: pastEvent1.id, userId: mike.id, status: "attending" },
+      { eventId: pastEvent1.id, userId: jessica.id, status: "attending" },
+      { eventId: pastEvent1.id, userId: david.id, status: "declined" },
+      
+      { eventId: pastEvent2.id, userId: alex.id, status: "attending" },
+      { eventId: pastEvent2.id, userId: sarah.id, status: "attending" },
+      { eventId: pastEvent2.id, userId: mike.id, status: "attending" },
+      { eventId: pastEvent2.id, userId: jessica.id, status: "attending" },
+      { eventId: pastEvent2.id, userId: david.id, status: "attending" },
     ]);
 
-    console.log("✅ Added attendees to events");
+    console.log("✅ Added RSVPs for past events");
 
-    // Add tags to past events
+    // Add tags to events
     await db.insert(eventTags).values([
-      { eventId: pastEvent1[0].id, tag: "Fresh" },
-      { eventId: pastEvent1[0].id, tag: "Expensive" },
-      { eventId: pastEvent1[0].id, tag: "Quiet" },
-      { eventId: pastEvent2[0].id, tag: "Casual" },
-      { eventId: pastEvent2[0].id, tag: "Craft Beer" },
-      { eventId: pastEvent2[0].id, tag: "Loud" },
+      { eventId: upcomingEvent.id, tag: "Fresh" },
+      { eventId: upcomingEvent.id, tag: "Romantic" },
+      { eventId: pastEvent1.id, tag: "Fresh" },
+      { eventId: pastEvent1.id, tag: "Expensive" },
+      { eventId: pastEvent2.id, tag: "Expensive" },
+      { eventId: pastEvent2.id, tag: "Quiet" },
     ]);
 
     console.log("✅ Added tags to events");
 
     console.log("\n🎉 Database seeded successfully!");
-    console.log("\nTest user credentials:");
-    console.log("  Username: alex");
-    console.log("  Password: password123");
+    console.log("\n📝 Test Users (all with password: 'password123'):");
+    console.log("   - alex@example.com (Owner)");
+    console.log("   - sarah@example.com (Admin)");
+    console.log("   - mike@example.com (Member)");
+    console.log("   - jessica@example.com (Member)");
+    console.log("   - david@example.com (Member)");
+    console.log("\n🍽️  Club: The Restaurant Club");
+    console.log("   - 1 upcoming event: La Trattoria (in 12 days)");
+    console.log("   - 2 past events with ratings and bills");
+    console.log("\n✨ You can now login with any of the test accounts!");
 
-    // --- FIX 2: Close the connection pool ---
-    await pool.end(); 
-    
   } catch (error) {
-    console.error("❌ Seed failed:", error);
-    process.exit(1);
+    console.error("❌ Error seeding database:", error);
+    throw error;
+  } finally {
+    await pool.end();
   }
 }
 
-seed();
+seed()
+  .then(() => {
+    console.log("\n✅ Seed script completed");
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error("\n❌ Seed script failed:", error);
+    process.exit(1);
+  });

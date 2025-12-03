@@ -1,39 +1,63 @@
-import { CURRENT_USER } from "@/lib/mockData";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Settings, Award, Star, LogOut, Users } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { logout } from "@/lib/api";
+import { toast } from "sonner";
 
 export default function Profile() {
+  const { user, setUser } = useAuth();
+  const [, setLocation] = useLocation();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setUser(null);
+      toast.success("Logged out successfully");
+      setLocation("/login");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to logout");
+    }
+  };
+
+  if (!user) {
+    return null;
+  }
   return (
     <div className="max-w-2xl mx-auto space-y-8">
       <div className="text-center space-y-4">
         <Avatar className="w-32 h-32 mx-auto border-4 border-background shadow-xl">
-          <AvatarImage src={CURRENT_USER.avatar} />
-          <AvatarFallback>{CURRENT_USER.name[0]}</AvatarFallback>
+          <AvatarImage src={user.avatar || undefined} />
+          <AvatarFallback>{user.name[0]}</AvatarFallback>
         </Avatar>
         <div>
-          <h1 className="text-3xl font-heading font-bold">{CURRENT_USER.name}</h1>
-          <p className="text-muted-foreground">Member since 2024</p>
-        </div>
-        <div className="flex justify-center gap-2">
-          <Badge variant="secondary" className="px-3 py-1">Sauce Connoisseur</Badge>
-          <Badge variant="secondary" className="px-3 py-1">Spicy Food Lover</Badge>
+          <h1 className="text-3xl font-heading font-bold">{user.name}</h1>
+          <p className="text-muted-foreground">
+            {user.email}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Member since {new Date(user.memberSince).getFullYear()}
+          </p>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
          <Card className="text-center border-none shadow-sm bg-primary/5">
             <CardContent className="pt-6">
-              <span className="block text-3xl font-bold text-primary">100%</span>
+              <span className="block text-3xl font-bold text-primary">
+                {user.stats?.attendance || 0}%
+              </span>
               <span className="text-xs text-muted-foreground font-medium uppercase">Attendance</span>
             </CardContent>
          </Card>
          <Card className="text-center border-none shadow-sm bg-secondary/20">
             <CardContent className="pt-6">
-              <span className="block text-3xl font-bold text-secondary-foreground">4.8</span>
+              <span className="block text-3xl font-bold text-secondary-foreground">
+                {user.stats?.avgRating || 0}
+              </span>
               <span className="text-xs text-muted-foreground font-medium uppercase">Avg Rating</span>
             </CardContent>
          </Card>
@@ -76,7 +100,11 @@ export default function Profile() {
         <Button variant="outline" className="w-full justify-start h-12">
           <Settings className="w-4 h-4 mr-2" /> Settings
         </Button>
-        <Button variant="ghost" className="w-full justify-start h-12 text-destructive hover:text-destructive hover:bg-destructive/10">
+        <Button 
+          onClick={handleLogout}
+          variant="ghost" 
+          className="w-full justify-start h-12 text-destructive hover:text-destructive hover:bg-destructive/10"
+        >
           <LogOut className="w-4 h-4 mr-2" /> Sign Out
         </Button>
       </div>

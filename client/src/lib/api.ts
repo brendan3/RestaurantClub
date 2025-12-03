@@ -9,7 +9,7 @@
  *   const events = await getEvents();
  */
 
-import { apiRequest } from "@/config";
+import { apiRequest, setAuthToken, getAuthToken } from "@/config";
 
 // Types (will be moved to shared schema later)
 export interface Event {
@@ -34,21 +34,16 @@ export interface Event {
 export interface User {
   id: string;
   name: string;
-  username: string;
-  avatar: string;
+  email: string;
+  username?: string;
+  avatar?: string;
   memberSince: string;
-  stats: {
+  stats?: {
     attendance: number;
     avgRating: number;
     totalDinners: number;
     avgBill: number;
   };
-  badges: Array<{
-    id: string;
-    name: string;
-    description: string;
-    icon: string;
-  }>;
 }
 
 export interface Club {
@@ -58,13 +53,113 @@ export interface Club {
   membersList: Array<{
     id: string;
     name: string;
-    avatar: string;
+    avatar?: string;
+    role?: string;
   }>;
   type: "private" | "public";
   createdAt: string;
 }
 
-// API Functions
+export interface AuthResponse {
+  user: User;
+  token: string;
+}
+
+// ============================================
+// AUTH FUNCTIONS
+// ============================================
+
+/**
+ * Sign up a new user
+ */
+export async function signup(email: string, password: string, name: string): Promise<AuthResponse> {
+  const response = await apiRequest<AuthResponse>("/api/auth/signup", {
+    method: "POST",
+    body: JSON.stringify({ email, password, name }),
+  });
+  
+  // Store the token
+  setAuthToken(response.token);
+  
+  return response;
+}
+
+/**
+ * Log in an existing user
+ */
+export async function login(email: string, password: string): Promise<AuthResponse> {
+  const response = await apiRequest<AuthResponse>("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+  
+  // Store the token
+  setAuthToken(response.token);
+  
+  return response;
+}
+
+/**
+ * Log out the current user
+ */
+export async function logout(): Promise<void> {
+  await apiRequest<{ message: string }>("/api/auth/logout", {
+    method: "POST",
+  });
+  
+  // Clear the token
+  setAuthToken(null);
+}
+
+/**
+ * Check if user is authenticated
+ */
+export function isAuthenticated(): boolean {
+  return !!getAuthToken();
+}
+
+// ============================================
+// USER FUNCTIONS
+// ============================================
+
+/**
+ * Get current user profile
+ */
+export async function getCurrentUser(): Promise<User> {
+  return apiRequest<User>("/api/user/me");
+}
+
+// ============================================
+// CLUB FUNCTIONS
+// ============================================
+
+/**
+ * Get user's clubs
+ */
+export async function getUserClubs(): Promise<Club[]> {
+  return apiRequest<Club[]>("/api/clubs/me");
+}
+
+/**
+ * Create a new club
+ */
+export async function createClub(name: string, type: "private" | "public" = "private"): Promise<Club> {
+  return apiRequest<Club>("/api/clubs", {
+    method: "POST",
+    body: JSON.stringify({ name, type }),
+  });
+}
+
+/**
+ * Get club by ID
+ */
+export async function getClubById(id: string): Promise<Club> {
+  return apiRequest<Club>(`/api/clubs/${id}`);
+}
+
+// ============================================
+// EVENT FUNCTIONS
+// ============================================
 
 /**
  * Get all events
@@ -88,18 +183,62 @@ export async function getPastEvents(): Promise<Event[]> {
 }
 
 /**
- * Get current user profile
+ * Get event by ID
  */
-export async function getCurrentUser(): Promise<User> {
-  return apiRequest<User>("/api/user/me");
+export async function getEventById(id: string): Promise<Event> {
+  return apiRequest<Event>(`/api/events/${id}`);
 }
 
 /**
- * Get user's clubs
+ * Create a new event
  */
-export async function getClubs(): Promise<Club[]> {
-  return apiRequest<Club[]>("/api/clubs");
+export async function createEvent(eventData: {
+  restaurantName: string;
+  cuisine: string;
+  eventDate: string;
+  location?: string;
+  imageUrl?: string;
+}): Promise<Event> {
+  return apiRequest<Event>("/api/events", {
+    method: "POST",
+    body: JSON.stringify(eventData),
+  });
 }
+
+// ============================================
+// RSVP FUNCTIONS
+// ============================================
+
+/**
+ * Create or update RSVP for an event
+ */
+export async function rsvpToEvent(
+  eventId: string, 
+  status: "attending" | "declined" | "maybe"
+): Promise<{ message: string; status: string }> {
+  return apiRequest<{ message: string; status: string }>(`/api/events/${eventId}/rsvp`, {
+    method: "POST",
+    body: JSON.stringify({ status }),
+  });
+}
+
+/**
+ * Get all RSVPs for an event
+ */
+export async function getEventRsvps(eventId: string): Promise<any[]> {
+  return apiRequest<any[]>(`/api/events/${eventId}/rsvps`);
+}
+
+/**
+ * Get current user's RSVP for an event
+ */
+export async function getUserRsvp(eventId: string): Promise<any | null> {
+  return apiRequest<any | null>(`/api/events/${eventId}/rsvp/me`);
+}
+
+// ============================================
+// HEALTH CHECK
+// ============================================
 
 /**
  * Health check
@@ -107,4 +246,3 @@ export async function getClubs(): Promise<Club[]> {
 export async function healthCheck(): Promise<{ ok: boolean; timestamp: string }> {
   return apiRequest<{ ok: boolean; timestamp: string }>("/api/health");
 }
-

@@ -9,12 +9,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
+import { createClub } from "@/lib/api";
 
 export default function CreateClub() {
   const [, setLocation] = useLocation();
   const [step, setStep] = useState(1);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -27,14 +29,24 @@ export default function CreateClub() {
   const handleNext = () => setStep(step + 1);
   const handleBack = () => setStep(step - 1);
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, this would send data to backend
-    toast({
-      title: "Club Created! 🎉",
-      description: `"${formData.name}" is now live. Time to eat!`,
-    });
-    setLocation("/club");
+    setIsSubmitting(true);
+    
+    try {
+      await createClub(formData.name, formData.privacy as "private" | "public");
+      toast.success(`Club "${formData.name}" created! 🎉`);
+      setLocation("/club");
+    } catch (error: any) {
+      if (error.message.includes("already belong to a club")) {
+        toast.error("You already belong to a club");
+        setLocation("/club");
+      } else {
+        toast.error(error.message || "Failed to create club");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleGenerateImage = () => {
@@ -221,8 +233,8 @@ export default function CreateClub() {
                   Next Step
                 </Button>
               ) : (
-                <Button type="submit" className="flex-1 gap-2 font-bold">
-                  <Check className="w-4 h-4" /> Launch Club
+                <Button type="submit" className="flex-1 gap-2 font-bold" disabled={isSubmitting}>
+                  <Check className="w-4 h-4" /> {isSubmitting ? "Creating..." : "Launch Club"}
                 </Button>
               )}
             </div>

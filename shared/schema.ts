@@ -6,11 +6,13 @@ import { z } from "zod";
 // Users table
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
   name: text("name").notNull(),
+  username: text("username"), // Optional display name
   avatar: text("avatar"),
   memberSince: timestamp("member_since").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Clubs table
@@ -64,10 +66,23 @@ export const eventTags = pgTable("event_tags", {
 
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+  email: true,
+  passwordHash: true,
   name: true,
+  username: true,
   avatar: true,
+});
+
+// Auth schemas
+export const signupSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+  name: z.string().min(1),
+});
+
+export const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string(),
 });
 
 export const insertClubSchema = createInsertSchema(clubs).pick({
@@ -89,3 +104,6 @@ export type Club = typeof clubs.$inferSelect;
 
 export type InsertEvent = z.infer<typeof insertEventSchema>;
 export type Event = typeof events.$inferSelect;
+
+export type SignupInput = z.infer<typeof signupSchema>;
+export type LoginInput = z.infer<typeof loginSchema>;

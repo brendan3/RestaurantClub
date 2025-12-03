@@ -6,6 +6,7 @@ export interface IStorage {
   // User methods
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   
   // Event methods
@@ -14,10 +15,17 @@ export interface IStorage {
   getPastEvents(clubId?: string): Promise<Event[]>;
   getEventById(id: string): Promise<Event | undefined>;
   createEvent(event: any): Promise<Event>;
+  createRsvp(eventId: string, userId: string, status: string): Promise<void>;
+  updateRsvp(eventId: string, userId: string, status: string): Promise<void>;
+  getEventRsvps(eventId: string): Promise<any[]>;
+  getUserRsvp(eventId: string, userId: string): Promise<any | undefined>;
   
   // Club methods
   getUserClubs(userId: string): Promise<Club[]>;
   getClubById(id: string): Promise<Club | undefined>;
+  createClub(club: any): Promise<Club>;
+  addClubMember(clubId: string, userId: string, role?: string): Promise<void>;
+  getClubMembers(clubId: string): Promise<any[]>;
   
   // Stats methods
   getUserStats(userId: string): Promise<{
@@ -42,6 +50,12 @@ export class MemStorage implements IStorage {
   async getUserByUsername(username: string): Promise<User | undefined> {
     return Array.from(this.users.values()).find(
       (user) => user.username === username,
+    );
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      (user) => user.email === email,
     );
   }
 
@@ -84,6 +98,35 @@ export class MemStorage implements IStorage {
   }
 
   async getClubById(): Promise<Club | undefined> {
+    return undefined;
+  }
+
+  async createClub(): Promise<Club> {
+    throw new Error("Not implemented");
+  }
+
+  async addClubMember(): Promise<void> {
+    throw new Error("Not implemented");
+  }
+
+  async getClubMembers(): Promise<any[]> {
+    return [];
+  }
+
+  // RSVP methods
+  async createRsvp(): Promise<void> {
+    throw new Error("Not implemented");
+  }
+
+  async updateRsvp(): Promise<void> {
+    throw new Error("Not implemented");
+  }
+
+  async getEventRsvps(): Promise<any[]> {
+    return [];
+  }
+
+  async getUserRsvp(): Promise<any | undefined> {
     return undefined;
   }
 

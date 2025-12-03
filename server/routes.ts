@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { mockEvents, mockUser, mockClubs } from "./mockData";
+import * as auth from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const useMockData = !process.env.DATABASE_URL;
@@ -15,14 +16,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // Events endpoints
-  app.get("/api/events", async (_req, res) => {
+  // ============================================
+  // AUTH ENDPOINTS
+  // ============================================
+  
+  app.post("/api/auth/signup", auth.signup);
+  app.post("/api/auth/login", auth.login);
+  app.post("/api/auth/logout", auth.logout);
+  
+  // Get current user (protected)
+  app.get("/api/user/me", auth.requireAuth, auth.getCurrentUser);
+
+  // ============================================
+  // CLUB ENDPOINTS
+  // ============================================
+  
+  // Get user's clubs
+  app.get("/api/clubs/me", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.json(mockClubs);
+    }
+    
+    try {
+      const clubs = await storage.getUserClubs(req.user!.id);
+      
+      // For each club, get members
+      const clubsWithMembers = await Promise.all(
+        clubs.map(async (club) => {
+          const members = await storage.getClubMembers(club.id);
+          return {
+            ...club,
+            members: members.length,
+            membersList: members.map(m => ({
+              id: m.id,
+              name: m.name,
+              avatar: m.avatar,
+              role: m.role,
+            })),
+          };
+        })
+      );
+      
+      res.json(clubsWithMembers);
+    } catch (error) {
+      console.error("Error fetching user clubs:", error);
+      res.status(500).json({ error: "Failed to fetch clubs" });
+    }
+  });
+  
+  // Create a new club
+  app.post("/api/clubs", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.json({ message: "Mock mode - club not created" });
+    }
+    
+    try {
+      const { name, type = "private" } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({ error: "Club name is required" });
+      }
+      
+      // Check if user already has a club (MVP: one club per user)
+      const existingClubs = await storage.getUserClubs(req.user!.id);
+      if (existingClubs.length > 0) {
+        return res.status(409).json({ 
+          error: "You already belong to a club",
+          club: existingClubs[0]
+        });
+      }
+      
+      // Create club
+      const club = await storage.createClub({
+        name,
+        type,
+      });
+      
+      // Add creator as owner
+      await storage.addClubMember(club.id, req.user!.id, "owner");
+      
+      res.json(club);
+    } catch (error) {
+      console.error("Error creating club:", error);
+      res.status(500).json({ error: "Failed to create club" });
+    }
+  });
+  
+  // Get club by ID with members
+  app.get("/api/clubs/:id", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.json(mockClubs[0]);
+    }
+    
+    try {
+      const club = await storage.getClubById(req.params.id);
+      if (!club) {
+        return res.status(404).json({ error: "Club not found" });
+      }
+      
+      const members = await storage.getClubMembers(club.id);
+      
+      res.json({
+        ...club,
+        members: members.length,
+        membersList: members.map(m => ({
+          id: m.id,
+          name: m.name,
+          avatar: m.avatar,
+          role: m.role,
+        })),
+      });
+    } catch (error) {
+      console.error("Error fetching club:", error);
+      res.status(500).json({ error: "Failed to fetch club" });
+    }
+  });
+
+  // ============================================
+  // EVENT ENDPOINTS
+  // ============================================
+  
+  // Get all events for user's club
+  app.get("/api/events", auth.requireAuth, async (req, res) => {
     if (useMockData) {
       return res.json(mockEvents);
     }
     
     try {
-      const events = await storage.getEvents();
+      // Get user's club
+      const clubs = await storage.getUserClubs(req.user!.id);
+      if (clubs.length === 0) {
+        return res.json([]);
+      }
+      
+      const events = await storage.getEvents(clubs[0].id);
       res.json(events);
     } catch (error) {
       console.error("Error fetching events:", error);
@@ -30,13 +157,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/events/upcoming", async (_req, res) => {
+  // Get upcoming events
+  app.get("/api/events/upcoming", auth.requireAuth, async (req, res) => {
     if (useMockData) {
       return res.json(mockEvents.filter(e => e.status === "confirmed"));
     }
     
     try {
-      const events = await storage.getUpcomingEvents();
+      const clubs = await storage.getUserClubs(req.user!.id);
+      if (clubs.length === 0) {
+        return res.json([]);
+      }
+      
+      const events = await storage.getUpcomingEvents(clubs[0].id);
       res.json(events);
     } catch (error) {
       console.error("Error fetching upcoming events:", error);
@@ -44,49 +177,183 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/events/past", async (_req, res) => {
+  // Get past events
+  app.get("/api/events/past", auth.requireAuth, async (req, res) => {
     if (useMockData) {
       return res.json(mockEvents.filter(e => e.status === "past"));
     }
     
     try {
-      const events = await storage.getPastEvents();
+      const clubs = await storage.getUserClubs(req.user!.id);
+      if (clubs.length === 0) {
+        return res.json([]);
+      }
+      
+      const events = await storage.getPastEvents(clubs[0].id);
       res.json(events);
     } catch (error) {
       console.error("Error fetching past events:", error);
       res.status(500).json({ error: "Failed to fetch past events" });
     }
   });
-
-  // User endpoints
-  app.get("/api/user/me", async (_req, res) => {
+  
+  // Create a new event
+  app.post("/api/events", auth.requireAuth, async (req, res) => {
     if (useMockData) {
-      return res.json(mockUser);
+      return res.json({ message: "Mock mode - event not created" });
     }
     
     try {
-      // For now, return mock data for current user
-      // In production, this would use session/auth
-      res.json(mockUser);
+      const { restaurantName, cuisine, eventDate, location, imageUrl } = req.body;
+      
+      if (!restaurantName || !cuisine || !eventDate) {
+        return res.status(400).json({ 
+          error: "Restaurant name, cuisine, and date are required" 
+        });
+      }
+      
+      // Get user's club
+      const clubs = await storage.getUserClubs(req.user!.id);
+      if (clubs.length === 0) {
+        return res.status(400).json({ 
+          error: "You must be in a club to create events" 
+        });
+      }
+      
+      // Create event
+      const event = await storage.createEvent({
+        clubId: clubs[0].id,
+        restaurantName,
+        cuisine,
+        eventDate: new Date(eventDate),
+        location,
+        status: "confirmed",
+        pickerId: req.user!.id,
+        imageUrl,
+      });
+      
+      res.json(event);
     } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ error: "Failed to fetch user" });
+      console.error("Error creating event:", error);
+      res.status(500).json({ error: "Failed to create event" });
+    }
+  });
+  
+  // Get event by ID with RSVPs
+  app.get("/api/events/:id", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      const event = mockEvents.find(e => e.id === req.params.id);
+      return res.json(event || null);
+    }
+    
+    try {
+      const event = await storage.getEventById(req.params.id);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+      
+      // Get RSVPs
+      const rsvps = await storage.getEventRsvps(event.id);
+      
+      res.json({
+        ...event,
+        rsvps,
+      });
+    } catch (error) {
+      console.error("Error fetching event:", error);
+      res.status(500).json({ error: "Failed to fetch event" });
     }
   });
 
-  // Clubs endpoints
-  app.get("/api/clubs", async (_req, res) => {
+  // ============================================
+  // RSVP ENDPOINTS
+  // ============================================
+  
+  // Create or update RSVP
+  app.post("/api/events/:id/rsvp", auth.requireAuth, async (req, res) => {
     if (useMockData) {
-      return res.json(mockClubs);
+      return res.json({ message: "Mock mode - RSVP not saved" });
     }
     
     try {
-      // For now, return mock data
-      // In production, this would use actual user ID from session
-      res.json(mockClubs);
+      const { status } = req.body;
+      const eventId = req.params.id;
+      
+      if (!status || !["attending", "declined", "maybe"].includes(status)) {
+        return res.status(400).json({ 
+          error: "Valid status is required (attending, declined, or maybe)" 
+        });
+      }
+      
+      // Check if event exists
+      const event = await storage.getEventById(eventId);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+      
+      // Check if user is in the event's club
+      const clubs = await storage.getUserClubs(req.user!.id);
+      const isInClub = clubs.some(c => c.id === event.clubId);
+      if (!isInClub) {
+        return res.status(403).json({ 
+          error: "You must be a member of the club to RSVP" 
+        });
+      }
+      
+      // Check if RSVP already exists
+      const existingRsvp = await storage.getUserRsvp(eventId, req.user!.id);
+      
+      if (existingRsvp) {
+        // Update existing RSVP
+        await storage.updateRsvp(eventId, req.user!.id, status);
+      } else {
+        // Create new RSVP
+        await storage.createRsvp(eventId, req.user!.id, status);
+      }
+      
+      res.json({ message: "RSVP saved successfully", status });
     } catch (error) {
-      console.error("Error fetching clubs:", error);
-      res.status(500).json({ error: "Failed to fetch clubs" });
+      console.error("Error saving RSVP:", error);
+      res.status(500).json({ error: "Failed to save RSVP" });
+    }
+  });
+  
+  // Get RSVPs for an event
+  app.get("/api/events/:id/rsvps", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.json([]);
+    }
+    
+    try {
+      const eventId = req.params.id;
+      
+      // Check if event exists
+      const event = await storage.getEventById(eventId);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+      
+      const rsvps = await storage.getEventRsvps(eventId);
+      res.json(rsvps);
+    } catch (error) {
+      console.error("Error fetching RSVPs:", error);
+      res.status(500).json({ error: "Failed to fetch RSVPs" });
+    }
+  });
+  
+  // Get user's RSVP for an event
+  app.get("/api/events/:id/rsvp/me", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.json(null);
+    }
+    
+    try {
+      const eventId = req.params.id;
+      const rsvp = await storage.getUserRsvp(eventId, req.user!.id);
+      res.json(rsvp || null);
+    } catch (error) {
+      console.error("Error fetching user RSVP:", error);
+      res.status(500).json({ error: "Failed to fetch RSVP" });
     }
   });
 
