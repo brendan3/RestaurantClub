@@ -38,21 +38,22 @@ export default function Club() {
     }
   };
 
-  const getInviteText = (clubName: string) => {
-    return `🍽️ Join my dinner club "${clubName}" on Restaurant Club!
+  const getInviteText = (club: ClubType) => {
+    const code = club.joinCode || "";
+    return `🍽️ Join my dinner club "${club.name}" on Restaurant Club!
+
+Use code: ${code}
 
 We use it to organize group dinners, track our favorite spots, and decide who picks the restaurant next.
 
-Download the app and sign up to join the fun!
-
-(Invite link coming soon)`;
+Sign up at the app and enter the code to join!`;
   };
 
   const handleCopyInvite = async () => {
     if (clubs.length === 0) return;
     
     try {
-      await navigator.clipboard.writeText(getInviteText(clubs[0].name));
+      await navigator.clipboard.writeText(getInviteText(clubs[0]));
       setCopied(true);
       toast.success("Invite text copied!");
       setTimeout(() => setCopied(false), 2000);
@@ -72,7 +73,7 @@ Download the app and sign up to join the fun!
     );
   }
 
-  // If user has no club, show create club prompt
+  // If user has no club, show create club or join club prompt
   if (clubs.length === 0) {
     return (
       <div className="space-y-10">
@@ -81,10 +82,15 @@ Download the app and sign up to join the fun!
           <h1 className="text-3xl md:text-4xl font-heading font-bold text-foreground">Join the Fun!</h1>
           <p className="text-muted-foreground text-lg">You're not part of a club yet. Start your culinary journey!</p>
           
-          <div className="flex justify-center pt-2">
+          <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
             <Button asChild className="rounded-full font-bold bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all hover:scale-105">
               <Link href="/create-club">
                 <Plus className="w-4 h-4 mr-2" /> Create Your Club
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="rounded-full font-bold shadow-sm hover:shadow-md transition-all hover:scale-105">
+              <Link href="/join">
+                <UsersIcon className="w-4 h-4 mr-2" /> Join with Code
               </Link>
             </Button>
           </div>
@@ -214,9 +220,23 @@ Download the app and sign up to join the fun!
           </div>
 
           <div className="p-6 space-y-5">
+            {/* Join Code Display */}
+            {club.joinCode ? (
+              <div className="bg-primary/5 border-2 border-primary/20 rounded-2xl p-4 text-center">
+                <p className="text-xs text-muted-foreground font-bold uppercase tracking-wide mb-2">Invite Code</p>
+                <p className="text-3xl font-heading font-black text-primary tracking-widest">
+                  {club.joinCode}
+                </p>
+              </div>
+            ) : (
+              <div className="bg-muted/50 rounded-2xl p-4 text-center">
+                <p className="text-sm text-muted-foreground">Loading invite code...</p>
+              </div>
+            )}
+
             {/* Invite Text Preview */}
             <div className="bg-muted/50 rounded-xl p-4 text-sm text-foreground/80 whitespace-pre-wrap border border-border/50">
-              {getInviteText(club.name)}
+              {getInviteText(club)}
             </div>
 
             {/* Copy Button */}
@@ -249,14 +269,6 @@ Download the app and sign up to join the fun!
                 </Button>
               </div>
             </div>
-
-            {/* TODO: Implement real invite links
-                When implementing:
-                1. Generate unique invite codes/links per club
-                2. Store in DB with expiration
-                3. Add /join/:code route to handle signups
-                4. Track who invited whom for stats
-            */}
           </div>
         </DialogContent>
       </Dialog>

@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { mockEvents, mockUser, mockClubs } from "./mockData";
 import * as auth from "./auth";
+import { generateJoinCode } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const useMockData = !process.env.DATABASE_URL;
@@ -42,12 +43,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const clubs = await storage.getUserClubs(req.user!.id);
       
-      // For each club, get members
+      // For each club, get members and include joinCode
+      // Also auto-generate joinCode for clubs that don't have one
       const clubsWithMembers = await Promise.all(
         clubs.map(async (club) => {
           const members = await storage.getClubMembers(club.id);
+          
+          // If club doesn't have a joinCode, generate one
+          let clubJoinCode = club.joinCode;
+          if (!clubJoinCode) {
+            clubJoinCode = generateJoinCode();
+            await storage.updateClubJoinCode(club.id, clubJoinCode);
+          }
+          
           return {
             ...club,
+            joinCode: clubJoinCode,
             members: members.length,
             membersList: members.map(m => ({
               id: m.id,
@@ -88,10 +99,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Create club
+      // Create club with a unique joinCode
+      const joinCode = generateJoinCode();
       const club = await storage.createClub({
         name,
         type,
+        joinCode,
       });
       
       // Add creator as owner
@@ -101,6 +114,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating club:", error);
       res.status(500).json({ error: "Failed to create club" });
+    }
+  });
+
+  // Join a club with a joinCode
+  app.post("/api/clubs/join", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.json({ message: "Mock mode - cannot join club" });
+    }
+    
+    try {
+      const { joinCode } = req.body;
+      
+      if (!joinCode || typeof joinCode !== "string") {
+        return res.status(400).json({ error: "Invite code is required" });
+      }
+      
+      // Normalize to uppercase
+      const normalizedCode = joinCode.trim().toUpperCase();
+      
+      // Look up club by joinCode
+      const club = await storage.getClubByJoinCode(normalizedCode);
+      if (!club) {
+        return res.status(400).json({ error: "Invalid invite code" });
+      }
+      
+      // Check if user is already a member
+      const isAlreadyMember = await storage.isUserInClub(req.user!.id, club.id);
+      if (isAlreadyMember) {
+        return res.status(400).json({ error: "You are already a member of this club" });
+      }
+      
+      // Add user as member
+      await storage.addClubMember(club.id, req.user!.id, "member");
+      
+      res.json({ 
+        message: "Successfully joined the club!",
+        club: {
+          id: club.id,
+          name: club.name,
+        }
+      });
+    } catch (error) {
+      console.error("Error joining club:", error);
+      res.status(500).json({ error: "Failed to join club" });
     }
   });
   
@@ -352,6 +409,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if RSVP already exists
       const existingRsvp = await storage.getUserRsvp(eventId, req.user!.id);
+      
+      // Capacity enforcement: only check when trying to attend (not decline/maybe)
+      if (status === "attending" && event.maxSeats) {
+        const currentRsvps = await storage.getEventRsvps(eventId);
+        const attendingCount = currentRsvps.filter(r => r.status === "attending").length;
+        
+        // If user is already attending, they can stay (no-op for capacity)
+        const wasAlreadyAttending = existingRsvp?.status === "attending";
+        
+        if (!wasAlreadyAttending && attendingCount >= event.maxSeats) {
+          return res.status(400).json({ error: "Event is full" });
+        }
+      }
       
       if (existingRsvp) {
         // Update existing RSVP

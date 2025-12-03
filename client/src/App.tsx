@@ -15,6 +15,7 @@ import CreateClub from "@/pages/CreateClub";
 import EventDetail from "@/pages/EventDetail";
 import Login from "@/pages/Login";
 import VerifyEmail from "@/pages/VerifyEmail";
+import Join from "@/pages/Join";
 import AppShell from "@/components/layout/AppShell";
 
 function ProtectedRoute({ component: Component }: { component: () => JSX.Element }) {
@@ -50,6 +51,12 @@ function Router() {
       
       <Route path="/verify-email">
         <VerifyEmail />
+      </Route>
+      
+      <Route path="/join">
+        <AppShell>
+          <ProtectedRoute component={Join} />
+        </AppShell>
       </Route>
       
       <Route path="/">

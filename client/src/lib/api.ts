@@ -67,6 +67,7 @@ export interface Club {
     role?: string;
   }>;
   type: "private" | "public";
+  joinCode?: string;
   createdAt: string;
 }
 
@@ -200,6 +201,16 @@ export async function createClub(name: string, type: "private" | "public" = "pri
  */
 export async function getClubById(id: string): Promise<Club> {
   return apiRequest<Club>(`/api/clubs/${id}`);
+}
+
+/**
+ * Join a club with a joinCode
+ */
+export async function joinClub(joinCode: string): Promise<{ message: string; club: { id: string; name: string } }> {
+  return apiRequest<{ message: string; club: { id: string; name: string } }>("/api/clubs/join", {
+    method: "POST",
+    body: JSON.stringify({ joinCode }),
+  });
 }
 
 // ============================================

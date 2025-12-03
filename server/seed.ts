@@ -1,5 +1,5 @@
 import { db, pool } from "./db";
-import { users, clubs, clubMembers, events, eventAttendees, eventTags } from "@shared/schema";
+import { users, clubs, clubMembers, events, eventAttendees, eventTags, generateJoinCode } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
 async function seed() {
@@ -61,15 +61,17 @@ async function seed() {
 
     console.log("✅ Created 5 users");
 
-    // Create a club
+    // Create a club with a joinCode
+    const clubJoinCode = generateJoinCode();
     const [restaurantClub] = await db.insert(clubs).values([
       {
         name: "The Restaurant Club",
         type: "private",
+        joinCode: clubJoinCode,
       },
     ]).returning();
 
-    console.log("✅ Created club:", restaurantClub.name);
+    console.log("✅ Created club:", restaurantClub.name, "with join code:", clubJoinCode);
 
     // Add members to the club
     await db.insert(clubMembers).values([
@@ -174,6 +176,7 @@ async function seed() {
     console.log("   - jessica@example.com (Member)");
     console.log("   - david@example.com (Member)");
     console.log("\n🍽️  Club: The Restaurant Club");
+    console.log("   - Join Code:", clubJoinCode);
     console.log("   - 1 upcoming event: La Trattoria (in 12 days)");
     console.log("   - 2 past events with ratings and bills");
     console.log("\n✨ You can now login with any of the test accounts!");

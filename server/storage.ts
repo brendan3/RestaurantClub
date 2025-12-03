@@ -30,8 +30,11 @@ export interface IStorage {
   // Club methods
   getUserClubs(userId: string): Promise<Club[]>;
   getClubById(id: string): Promise<Club | undefined>;
+  getClubByJoinCode(joinCode: string): Promise<Club | undefined>;
   createClub(club: any): Promise<Club>;
+  updateClubJoinCode(clubId: string, joinCode: string): Promise<void>;
   addClubMember(clubId: string, userId: string, role?: string): Promise<void>;
+  isUserInClub(userId: string, clubId: string): Promise<boolean>;
   getClubMembers(clubId: string): Promise<any[]>;
   
   // Stats methods
@@ -78,6 +81,7 @@ export class MemStorage implements IStorage {
       ...insertUser, 
       id,
       memberSince: new Date(),
+      username: insertUser.username ?? null,
       avatar: insertUser.avatar || null,
       emailVerified: false,
       verificationToken: null,
@@ -139,12 +143,24 @@ export class MemStorage implements IStorage {
     return undefined;
   }
 
+  async getClubByJoinCode(): Promise<Club | undefined> {
+    return undefined;
+  }
+
   async createClub(): Promise<Club> {
+    throw new Error("Not implemented");
+  }
+
+  async updateClubJoinCode(): Promise<void> {
     throw new Error("Not implemented");
   }
 
   async addClubMember(): Promise<void> {
     throw new Error("Not implemented");
+  }
+
+  async isUserInClub(): Promise<boolean> {
+    return false;
   }
 
   async getClubMembers(): Promise<any[]> {

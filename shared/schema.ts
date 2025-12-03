@@ -23,8 +23,19 @@ export const clubs = pgTable("clubs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   type: text("type").notNull(), // 'private' | 'public'
+  joinCode: varchar("join_code", { length: 16 }),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// Helper to generate a random join code (6 uppercase letters/digits)
+export function generateJoinCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Avoid confusing chars like 0/O, 1/I
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
 
 // Club members (many-to-many)
 export const clubMembers = pgTable("club_members", {

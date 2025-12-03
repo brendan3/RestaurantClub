@@ -158,6 +158,9 @@ export default function Login() {
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-bold">🍽️ RestaurantClub</CardTitle>
           <CardDescription>Join your dining club</CardDescription>
+          <p className="pt-2 text-sm text-muted-foreground">
+            Have an invite code? Sign up first, then join your club from inside the app.
+          </p>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="login" className="w-full">

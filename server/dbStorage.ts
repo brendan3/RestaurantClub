@@ -129,6 +129,7 @@ export class DatabaseStorage implements IStorage {
         id: clubs.id,
         name: clubs.name,
         type: clubs.type,
+        joinCode: clubs.joinCode,
         createdAt: clubs.createdAt,
       })
       .from(clubs)
@@ -144,9 +145,21 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async getClubByJoinCode(joinCode: string): Promise<Club | undefined> {
+    const result = await db.select().from(clubs).where(eq(clubs.joinCode, joinCode)).limit(1);
+    return result[0];
+  }
+
   async createClub(clubData: any): Promise<Club> {
     const result = await db.insert(clubs).values(clubData).returning();
     return result[0];
+  }
+
+  async updateClubJoinCode(clubId: string, joinCode: string): Promise<void> {
+    await db
+      .update(clubs)
+      .set({ joinCode })
+      .where(eq(clubs.id, clubId));
   }
 
   async addClubMember(clubId: string, userId: string, role: string = "member"): Promise<void> {
@@ -155,6 +168,15 @@ export class DatabaseStorage implements IStorage {
       userId,
       role,
     });
+  }
+
+  async isUserInClub(userId: string, clubId: string): Promise<boolean> {
+    const result = await db
+      .select()
+      .from(clubMembers)
+      .where(and(eq(clubMembers.userId, userId), eq(clubMembers.clubId, clubId)))
+      .limit(1);
+    return result.length > 0;
   }
 
   async getClubMembers(clubId: string): Promise<any[]> {

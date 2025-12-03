@@ -81,7 +81,16 @@ export default function EventDetail() {
       setRsvps(rsvpData);
       setUserRsvp(userRsvpData);
     } catch (error: any) {
-      toast.error(error.message || "Failed to RSVP");
+      const message = error.message || "Failed to RSVP";
+      // Special handling for capacity errors
+      if (message.includes("Event is full")) {
+        toast.error("This event is full. You can't RSVP right now.");
+        // Reload RSVPs to update the UI with current state
+        const rsvpData = await getEventRsvps(eventId);
+        setRsvps(rsvpData);
+      } else {
+        toast.error(message);
+      }
     } finally {
       setIsRsvping(false);
     }

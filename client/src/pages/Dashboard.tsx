@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { useEventModal } from "@/lib/event-modal-context";
-import { getUpcomingEvents, getUserRsvp, rsvpToEvent, getEventRsvps, getUserClubs, type Event } from "@/lib/api";
+import { getUpcomingEvents, getUserRsvp, rsvpToEvent, getEventRsvps, getUserClubs, type Event, type Club } from "@/lib/api";
 import { toast } from "sonner";
 import AddEventModal from "@/components/AddEventModal";
 
@@ -29,7 +29,7 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRsvping, setIsRsvping] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
-  const [clubName, setClubName] = useState<string>("");
+  const [currentClub, setCurrentClub] = useState<Club | null>(null);
   const [copied, setCopied] = useState(false);
 
   // Current event based on index
@@ -56,7 +56,7 @@ export default function Dashboard() {
       setUpcomingEvents(events);
       
       if (clubs.length > 0) {
-        setClubName(clubs[0].name);
+        setCurrentClub(clubs[0]);
       }
       
       if (events.length > 0) {
@@ -65,6 +65,10 @@ export default function Dashboard() {
       }
     } catch (error: any) {
       console.error("Failed to load dashboard data:", error);
+      // Only show toast for non-auth errors (auth errors handled by apiRequest)
+      if (!error.message?.includes("session")) {
+        toast.error("Something went wrong. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -94,7 +98,13 @@ export default function Dashboard() {
       // Reload RSVP data
       await loadEventRsvps(upcomingEvent.id);
     } catch (error: any) {
-      toast.error(error.message || "Failed to RSVP");
+      const message = error.message || "Failed to RSVP";
+      // Special handling for capacity errors
+      if (message.includes("Event is full")) {
+        toast.error("This event is full. You can't RSVP right now.");
+      } else {
+        toast.error(message);
+      }
     } finally {
       setIsRsvping(false);
     }
@@ -137,14 +147,15 @@ export default function Dashboard() {
 
   // Invite functionality
   const getInviteText = () => {
-    const name = clubName || "our dinner club";
+    const name = currentClub?.name || "our dinner club";
+    const code = currentClub?.joinCode || "";
     return `🍽️ Join my dinner club "${name}" on Restaurant Club!
+
+Use code: ${code}
 
 We use it to organize group dinners, track our favorite spots, and decide who picks the restaurant next.
 
-Download the app and sign up to join the fun!
-
-(Invite link coming soon)`;
+Sign up at the app and enter the code to join!`;
   };
 
   const handleCopyInvite = async () => {
@@ -341,12 +352,26 @@ Download the app and sign up to join the fun!
                 Invite Friends
               </DialogTitle>
               <DialogDescription className="text-muted-foreground">
-                Share this with friends to invite them to {clubName || "your club"}
+                Share this with friends to invite them to {currentClub?.name || "your club"}
               </DialogDescription>
             </DialogHeader>
           </div>
 
           <div className="p-6 space-y-5">
+            {/* Join Code Display */}
+            {currentClub?.joinCode ? (
+              <div className="bg-primary/5 border-2 border-primary/20 rounded-2xl p-4 text-center">
+                <p className="text-xs text-muted-foreground font-bold uppercase tracking-wide mb-2">Invite Code</p>
+                <p className="text-3xl font-heading font-black text-primary tracking-widest">
+                  {currentClub.joinCode}
+                </p>
+              </div>
+            ) : (
+              <div className="bg-muted/50 rounded-2xl p-4 text-center">
+                <p className="text-sm text-muted-foreground">Loading invite code...</p>
+              </div>
+            )}
+
             {/* Invite Text Preview */}
             <div className="bg-muted/50 rounded-xl p-4 text-sm text-foreground/80 whitespace-pre-wrap border border-border/50">
               {getInviteText()}

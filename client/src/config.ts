@@ -27,22 +27,47 @@ export function getAuthToken(): string | null {
   return authToken;
 }
 
+// Callback for auth expiration - set by auth-context
+let onAuthExpired: (() => void) | null = null;
+
+export function setAuthExpiredCallback(callback: () => void) {
+  onAuthExpired = callback;
+}
+
 // Helper function for API calls
 export async function apiRequest<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const token = getAuthToken();
   
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options?.headers,
-    },
-    credentials: "include",
-    ...options,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options?.headers,
+      },
+      credentials: "include",
+      ...options,
+    });
+  } catch (error) {
+    // Network error - throw a user-friendly message
+    throw new Error("Network error. Please check your connection and try again.");
+  }
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
+    
+    // Handle 401 Unauthorized - session expired
+    if (response.status === 401) {
+      // Clear auth token
+      setAuthToken(null);
+      // Trigger auth expiration callback
+      if (onAuthExpired) {
+        onAuthExpired();
+      }
+      throw new Error("Your session has expired. Please log in again.");
+    }
+    
     throw new Error(errorData.error || `API Error: ${response.statusText}`);
   }
 
