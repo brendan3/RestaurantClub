@@ -204,11 +204,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     try {
-      const { restaurantName, cuisine, eventDate, location, imageUrl } = req.body;
+      const { restaurantName, cuisine, eventDate, location, notes, maxSeats, imageUrl } = req.body;
       
       if (!restaurantName || !cuisine || !eventDate) {
         return res.status(400).json({ 
           error: "Restaurant name, cuisine, and date are required" 
+        });
+      }
+      
+      // Validate maxSeats if provided
+      if (maxSeats !== undefined && (typeof maxSeats !== 'number' || maxSeats < 1 || maxSeats > 100)) {
+        return res.status(400).json({ 
+          error: "Max seats must be a number between 1 and 100" 
         });
       }
       
@@ -226,16 +233,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
         restaurantName,
         cuisine,
         eventDate: new Date(eventDate),
-        location,
+        location: location || null,
+        notes: notes || null,
+        maxSeats: maxSeats || null,
         status: "confirmed",
         pickerId: req.user!.id,
-        imageUrl,
+        imageUrl: imageUrl || null,
       });
       
       res.json(event);
     } catch (error) {
       console.error("Error creating event:", error);
       res.status(500).json({ error: "Failed to create event" });
+    }
+  });
+  
+  // Update an event (notes, location, etc.)
+  app.patch("/api/events/:id", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.json({ message: "Mock mode - event not updated" });
+    }
+    
+    try {
+      const eventId = req.params.id;
+      const { notes, location, maxSeats } = req.body;
+      
+      // Check if event exists
+      const event = await storage.getEventById(eventId);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+      
+      // Check if user is in the event's club
+      const clubs = await storage.getUserClubs(req.user!.id);
+      const isInClub = clubs.some(c => c.id === event.clubId);
+      if (!isInClub) {
+        return res.status(403).json({ 
+          error: "You must be a member of the club to update events" 
+        });
+      }
+      
+      // Update event
+      const updatedEvent = await storage.updateEvent(eventId, {
+        notes: notes !== undefined ? notes : undefined,
+        location: location !== undefined ? location : undefined,
+        maxSeats: maxSeats !== undefined ? maxSeats : undefined,
+      });
+      
+      res.json(updatedEvent);
+    } catch (error) {
+      console.error("Error updating event:", error);
+      res.status(500).json({ error: "Failed to update event" });
     }
   });
   

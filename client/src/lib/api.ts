@@ -14,16 +14,26 @@ import { apiRequest, setAuthToken, getAuthToken } from "@/config";
 // Types (will be moved to shared schema later)
 export interface Event {
   id: string;
-  restaurant: string;
+  clubId: string;
+  restaurantName: string;
   cuisine: string;
-  date: string;
-  location?: string;
+  eventDate: string;
+  location?: string | null;
+  notes?: string | null;
+  maxSeats?: number | null;
   status: "pending" | "confirmed" | "past";
-  rating?: number;
+  rating?: number | null;
+  totalBill?: number | null;
+  pickerId: string;
+  imageUrl?: string | null;
+  createdAt?: string;
+  // Legacy fields for backward compatibility with mock data
+  restaurant?: string;
+  date?: string;
   bill?: number;
   tags?: string[];
-  attendees: string[];
-  picker: {
+  attendees?: string[];
+  picker?: {
     id: string;
     name: string;
     avatar: string;
@@ -197,10 +207,26 @@ export async function createEvent(eventData: {
   cuisine: string;
   eventDate: string;
   location?: string;
+  notes?: string;
+  maxSeats?: number;
   imageUrl?: string;
 }): Promise<Event> {
   return apiRequest<Event>("/api/events", {
     method: "POST",
+    body: JSON.stringify(eventData),
+  });
+}
+
+/**
+ * Update an existing event
+ */
+export async function updateEvent(eventId: string, eventData: {
+  notes?: string;
+  location?: string;
+  maxSeats?: number;
+}): Promise<Event> {
+  return apiRequest<Event>(`/api/events/${eventId}`, {
+    method: "PATCH",
     body: JSON.stringify(eventData),
   });
 }

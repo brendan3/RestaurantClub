@@ -1,18 +1,27 @@
 import { useEffect, useState } from "react";
 import { SUPERLATIVES, ASSETS } from "@/lib/mockData";
 import { Link } from "wouter";
-import { Trophy, Crown, Utensils, Plus, ThumbsUp, Users as UsersIcon } from "lucide-react";
+import { Trophy, Crown, Utensils, Plus, ThumbsUp, Users as UsersIcon, Copy, Check, Share2, Mail, MessageCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { getUserClubs, type Club as ClubType } from "@/lib/api";
 import { toast } from "sonner";
 
 export default function Club() {
   const [clubs, setClubs] = useState<ClubType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     loadClubs();
@@ -26,6 +35,29 @@ export default function Club() {
       toast.error(error.message || "Failed to load clubs");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const getInviteText = (clubName: string) => {
+    return `🍽️ Join my dinner club "${clubName}" on Restaurant Club!
+
+We use it to organize group dinners, track our favorite spots, and decide who picks the restaurant next.
+
+Download the app and sign up to join the fun!
+
+(Invite link coming soon)`;
+  };
+
+  const handleCopyInvite = async () => {
+    if (clubs.length === 0) return;
+    
+    try {
+      await navigator.clipboard.writeText(getInviteText(clubs[0].name));
+      setCopied(true);
+      toast.success("Invite text copied!");
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      toast.error("Failed to copy");
     }
   };
 
@@ -103,7 +135,11 @@ export default function Club() {
                 )}
               </div>
             ))}
-            <Button variant="outline" className="w-full mt-4 border-dashed border-2 h-12 text-muted-foreground hover:text-primary hover:border-primary hover:bg-primary/5">
+            <Button 
+              variant="outline" 
+              className="w-full mt-4 border-dashed border-2 h-12 text-muted-foreground hover:text-primary hover:border-primary hover:bg-primary/5"
+              onClick={() => setIsInviteOpen(true)}
+            >
               <Plus className="w-4 h-4 mr-2" /> Invite New Member
             </Button>
           </CardContent>
@@ -161,6 +197,69 @@ export default function Club() {
           ))}
         </div>
       </div>
+
+      {/* Invite Modal */}
+      <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
+        <DialogContent className="sm:max-w-[450px] rounded-[1.5rem] p-0 overflow-hidden">
+          <div className="bg-gradient-to-br from-primary/10 to-secondary/20 p-6 pb-4">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-heading font-bold flex items-center gap-2">
+                <Share2 className="w-6 h-6 text-primary" />
+                Invite Friends
+              </DialogTitle>
+              <DialogDescription className="text-muted-foreground">
+                Share this with friends to invite them to {club.name}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="p-6 space-y-5">
+            {/* Invite Text Preview */}
+            <div className="bg-muted/50 rounded-xl p-4 text-sm text-foreground/80 whitespace-pre-wrap border border-border/50">
+              {getInviteText(club.name)}
+            </div>
+
+            {/* Copy Button */}
+            <Button 
+              onClick={handleCopyInvite}
+              className="w-full rounded-full font-bold h-12 gap-2"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-5 h-5" /> Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="w-5 h-5" /> Copy Invite Text
+                </>
+              )}
+            </Button>
+
+            {/* Future: Share Options */}
+            <div className="pt-2 border-t">
+              <p className="text-xs text-muted-foreground text-center mb-3">
+                More sharing options coming soon
+              </p>
+              <div className="flex justify-center gap-3">
+                <Button variant="outline" size="icon" className="rounded-full w-10 h-10 opacity-50 cursor-not-allowed" disabled>
+                  <Mail className="w-4 h-4" />
+                </Button>
+                <Button variant="outline" size="icon" className="rounded-full w-10 h-10 opacity-50 cursor-not-allowed" disabled>
+                  <MessageCircle className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* TODO: Implement real invite links
+                When implementing:
+                1. Generate unique invite codes/links per club
+                2. Store in DB with expiration
+                3. Add /join/:code route to handle signups
+                4. Track who invited whom for stats
+            */}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

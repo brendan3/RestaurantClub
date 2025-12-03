@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
+import { EventModalProvider } from "@/lib/event-modal-context";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
 import History from "@/pages/History";
@@ -11,6 +12,7 @@ import Club from "@/pages/Club";
 import Profile from "@/pages/Profile";
 import Social from "@/pages/Social";
 import CreateClub from "@/pages/CreateClub";
+import EventDetail from "@/pages/EventDetail";
 import Login from "@/pages/Login";
 import AppShell from "@/components/layout/AppShell";
 
@@ -87,6 +89,12 @@ function Router() {
         </AppShell>
       </Route>
       
+      <Route path="/event/:id">
+        <AppShell>
+          <ProtectedRoute component={EventDetail} />
+        </AppShell>
+      </Route>
+      
       <Route component={NotFound} />
     </Switch>
   );
@@ -96,10 +104,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
+        <EventModalProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+          </TooltipProvider>
+        </EventModalProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

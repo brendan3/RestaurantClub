@@ -82,6 +82,21 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async updateEvent(id: string, updates: { notes?: string; location?: string; maxSeats?: number }): Promise<Event> {
+    const updateData: any = {};
+    if (updates.notes !== undefined) updateData.notes = updates.notes;
+    if (updates.location !== undefined) updateData.location = updates.location;
+    if (updates.maxSeats !== undefined) updateData.maxSeats = updates.maxSeats;
+    
+    const result = await db
+      .update(events)
+      .set(updateData)
+      .where(eq(events.id, id))
+      .returning();
+    
+    return result[0];
+  }
+
   async getUserClubs(userId: string): Promise<Club[]> {
     // if (!this.db) return [];
     

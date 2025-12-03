@@ -15,6 +15,7 @@ export interface IStorage {
   getPastEvents(clubId?: string): Promise<Event[]>;
   getEventById(id: string): Promise<Event | undefined>;
   createEvent(event: any): Promise<Event>;
+  updateEvent(id: string, updates: { notes?: string; location?: string; maxSeats?: number }): Promise<Event>;
   createRsvp(eventId: string, userId: string, status: string): Promise<void>;
   updateRsvp(eventId: string, userId: string, status: string): Promise<void>;
   getEventRsvps(eventId: string): Promise<any[]>;
@@ -89,6 +90,10 @@ export class MemStorage implements IStorage {
   }
 
   async createEvent(): Promise<Event> {
+    throw new Error("Not implemented");
+  }
+
+  async updateEvent(): Promise<Event> {
     throw new Error("Not implemented");
   }
 

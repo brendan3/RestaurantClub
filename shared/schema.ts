@@ -40,6 +40,8 @@ export const events = pgTable("events", {
   cuisine: text("cuisine").notNull(),
   eventDate: timestamp("event_date").notNull(),
   location: text("location"),
+  notes: text("notes"), // Event description/notes
+  maxSeats: integer("max_seats"), // Optional max attendees
   status: text("status").notNull(), // 'pending' | 'confirmed' | 'past'
   rating: integer("rating"),
   totalBill: integer("total_bill"),

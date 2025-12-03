@@ -1,45 +1,85 @@
 import { useState, useEffect } from "react";
+import { Link } from "wouter";
 import { SOCIAL_FEED, ASSETS } from "@/lib/mockData";
-import { Calendar, Clock, MapPin, MessageSquare, Heart, Share2, ChefHat, Check, X } from "lucide-react";
+import { Calendar, Clock, MapPin, MessageSquare, Heart, Share2, ChefHat, Check, X, Plus, ExternalLink, ChevronLeft, ChevronRight, Copy, Mail, MessageCircle as MessageCircleIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
-import { getUpcomingEvents, getUserRsvp, rsvpToEvent, getEventRsvps } from "@/lib/api";
+import { useEventModal } from "@/lib/event-modal-context";
+import { getUpcomingEvents, getUserRsvp, rsvpToEvent, getEventRsvps, getUserClubs, type Event } from "@/lib/api";
 import { toast } from "sonner";
+import AddEventModal from "@/components/AddEventModal";
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const [upcomingEvent, setUpcomingEvent] = useState<any>(null);
+  const { isAddEventOpen, setIsAddEventOpen } = useEventModal();
+  const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [userRsvp, setUserRsvp] = useState<any>(null);
   const [eventRsvps, setEventRsvps] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRsvping, setIsRsvping] = useState(false);
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [clubName, setClubName] = useState<string>("");
+  const [copied, setCopied] = useState(false);
+
+  // Current event based on index
+  const upcomingEvent = upcomingEvents.length > 0 ? upcomingEvents[currentIndex] : null;
 
   useEffect(() => {
     loadDashboardData();
   }, []);
 
+  // Load RSVPs when current event changes
+  useEffect(() => {
+    if (upcomingEvent) {
+      loadEventRsvps(upcomingEvent.id);
+    }
+  }, [currentIndex, upcomingEvents]);
+
   const loadDashboardData = async () => {
     try {
-      const events = await getUpcomingEvents();
+      const [events, clubs] = await Promise.all([
+        getUpcomingEvents(),
+        getUserClubs(),
+      ]);
+      
+      setUpcomingEvents(events);
+      
+      if (clubs.length > 0) {
+        setClubName(clubs[0].name);
+      }
+      
       if (events.length > 0) {
-        const nextEvent = events[0];
-        setUpcomingEvent(nextEvent);
-        
-        // Load user's RSVP
-        const rsvp = await getUserRsvp(nextEvent.id);
-        setUserRsvp(rsvp);
-        
-        // Load all RSVPs
-        const rsvps = await getEventRsvps(nextEvent.id);
-        setEventRsvps(rsvps);
+        // Load RSVPs for the first event
+        await loadEventRsvps(events[0].id);
       }
     } catch (error: any) {
       console.error("Failed to load dashboard data:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadEventRsvps = async (eventId: string) => {
+    try {
+      const [rsvp, rsvps] = await Promise.all([
+        getUserRsvp(eventId),
+        getEventRsvps(eventId),
+      ]);
+      setUserRsvp(rsvp);
+      setEventRsvps(rsvps);
+    } catch (error: any) {
+      console.error("Failed to load RSVPs:", error);
     }
   };
 
@@ -52,15 +92,25 @@ export default function Dashboard() {
       toast.success(status === "attending" ? "You're in! 🎉" : "RSVP updated");
       
       // Reload RSVP data
-      const rsvp = await getUserRsvp(upcomingEvent.id);
-      setUserRsvp(rsvp);
-      const rsvps = await getEventRsvps(upcomingEvent.id);
-      setEventRsvps(rsvps);
+      await loadEventRsvps(upcomingEvent.id);
     } catch (error: any) {
       toast.error(error.message || "Failed to RSVP");
     } finally {
       setIsRsvping(false);
     }
+  };
+
+  // Carousel navigation (circular)
+  const goToPrevEvent = () => {
+    setCurrentIndex(prev => 
+      prev === 0 ? upcomingEvents.length - 1 : prev - 1
+    );
+  };
+
+  const goToNextEvent = () => {
+    setCurrentIndex(prev => 
+      prev === upcomingEvents.length - 1 ? 0 : prev + 1
+    );
   };
 
   const calculateDaysUntil = (dateString: string) => {
@@ -72,6 +122,41 @@ export default function Dashboard() {
   };
 
   const attendingCount = eventRsvps.filter(r => r.status === "attending").length;
+  
+  // Capacity display helper
+  const getCapacityDisplay = () => {
+    if (!upcomingEvent?.maxSeats) {
+      return `${attendingCount} attending`;
+    }
+    const remaining = upcomingEvent.maxSeats - attendingCount;
+    if (remaining <= 0) {
+      return `${attendingCount} attending · Full`;
+    }
+    return `${attendingCount} attending · ${remaining} seat${remaining === 1 ? '' : 's'} left`;
+  };
+
+  // Invite functionality
+  const getInviteText = () => {
+    const name = clubName || "our dinner club";
+    return `🍽️ Join my dinner club "${name}" on Restaurant Club!
+
+We use it to organize group dinners, track our favorite spots, and decide who picks the restaurant next.
+
+Download the app and sign up to join the fun!
+
+(Invite link coming soon)`;
+  };
+
+  const handleCopyInvite = async () => {
+    try {
+      await navigator.clipboard.writeText(getInviteText());
+      setCopied(true);
+      toast.success("Invite text copied!");
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      toast.error("Failed to copy");
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -83,9 +168,21 @@ export default function Dashboard() {
             Hungry, {user?.name}? 😋
           </h1>
         </div>
-        <Button variant="ghost" className="hidden md:flex gap-2 rounded-full bg-white shadow-sm border border-white/50 text-foreground hover:bg-primary/10 hover:text-primary transition-all hover:scale-105">
-          <Share2 className="w-4 h-4" /> Invite Friend
-        </Button>
+        <div className="hidden md:flex gap-2">
+          <Button 
+            onClick={() => setIsAddEventOpen(true)}
+            className="gap-2 rounded-full bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-all hover:scale-105"
+          >
+            <Plus className="w-4 h-4" /> Add Event
+          </Button>
+          <Button 
+            variant="ghost" 
+            onClick={() => setIsInviteOpen(true)}
+            className="gap-2 rounded-full bg-white shadow-sm border border-white/50 text-foreground hover:bg-primary/10 hover:text-primary transition-all hover:scale-105"
+          >
+            <Share2 className="w-4 h-4" /> Invite Friend
+          </Button>
+        </div>
       </div>
 
       {/* Hero Card - Next Event */}
@@ -106,6 +203,33 @@ export default function Dashboard() {
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
           </div>
+
+          {/* Carousel Navigation Arrows */}
+          {upcomingEvents.length > 1 && (
+            <>
+              <button
+                onClick={goToPrevEvent}
+                className="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full text-white transition-all hover:scale-110"
+                aria-label="Previous event"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+              <button
+                onClick={goToNextEvent}
+                className="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full text-white transition-all hover:scale-110"
+                aria-label="Next event"
+              >
+                <ChevronRight className="w-6 h-6" />
+              </button>
+            </>
+          )}
+
+          {/* Event Counter Indicator */}
+          {upcomingEvents.length > 1 && (
+            <div className="absolute top-4 right-4 z-10 bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-full text-white text-sm font-medium">
+              {currentIndex + 1} / {upcomingEvents.length}
+            </div>
+          )}
           
           <div className="relative p-8 md:p-10 flex flex-col md:flex-row gap-8 md:items-end justify-between h-full min-h-[350px]">
             <div className="space-y-6 max-w-lg">
@@ -137,9 +261,18 @@ export default function Dashboard() {
                   ))}
                 </div>
                 <span className="text-sm font-medium text-white/80">
-                  {attendingCount} attending
+                  {getCapacityDisplay()}
                 </span>
               </div>
+              <Button 
+                asChild
+                variant="ghost" 
+                className="mt-4 text-white/80 hover:text-white hover:bg-white/10 rounded-full gap-2"
+              >
+                <Link href={`/event/${upcomingEvent.id}`}>
+                  View Details <ExternalLink className="w-4 h-4" />
+                </Link>
+              </Button>
             </div>
 
             <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-5 rounded-[2rem] text-center min-w-[140px] shadow-lg">
@@ -181,11 +314,77 @@ export default function Dashboard() {
         <div className="relative overflow-hidden rounded-[2.5rem] bg-muted shadow-float p-10 text-center">
           <h3 className="text-2xl font-heading font-bold mb-2">No Upcoming Dinners</h3>
           <p className="text-muted-foreground mb-4">Time to plan your next culinary adventure!</p>
-          <Button className="rounded-full font-bold">
+          <Button 
+            className="rounded-full font-bold"
+            onClick={() => setIsAddEventOpen(true)}
+          >
+            <Plus className="w-4 h-4 mr-2" />
             Create Event
           </Button>
         </div>
       )}
+
+      {/* Add Event Modal */}
+      <AddEventModal
+        open={isAddEventOpen}
+        onOpenChange={setIsAddEventOpen}
+        onEventCreated={loadDashboardData}
+      />
+
+      {/* Invite Modal */}
+      <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
+        <DialogContent className="sm:max-w-[450px] rounded-[1.5rem] p-0 overflow-hidden">
+          <div className="bg-gradient-to-br from-primary/10 to-secondary/20 p-6 pb-4">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-heading font-bold flex items-center gap-2">
+                <Share2 className="w-6 h-6 text-primary" />
+                Invite Friends
+              </DialogTitle>
+              <DialogDescription className="text-muted-foreground">
+                Share this with friends to invite them to {clubName || "your club"}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="p-6 space-y-5">
+            {/* Invite Text Preview */}
+            <div className="bg-muted/50 rounded-xl p-4 text-sm text-foreground/80 whitespace-pre-wrap border border-border/50">
+              {getInviteText()}
+            </div>
+
+            {/* Copy Button */}
+            <Button 
+              onClick={handleCopyInvite}
+              className="w-full rounded-full font-bold h-12 gap-2"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-5 h-5" /> Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="w-5 h-5" /> Copy Invite Text
+                </>
+              )}
+            </Button>
+
+            {/* Future: Share Options */}
+            <div className="pt-2 border-t">
+              <p className="text-xs text-muted-foreground text-center mb-3">
+                More sharing options coming soon
+              </p>
+              <div className="flex justify-center gap-3">
+                <Button variant="outline" size="icon" className="rounded-full w-10 h-10 opacity-50 cursor-not-allowed" disabled>
+                  <Mail className="w-4 h-4" />
+                </Button>
+                <Button variant="outline" size="icon" className="rounded-full w-10 h-10 opacity-50 cursor-not-allowed" disabled>
+                  <MessageCircleIcon className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Two Column Layout */}
       <div className="grid md:grid-cols-3 gap-8">

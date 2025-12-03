@@ -1,4 +1,5 @@
 import { PAST_EVENTS } from "@/lib/mockData";
+import { Link } from "wouter";
 import { Star, MapPin, Calendar, Filter, Search } from "lucide-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -89,8 +90,8 @@ export default function History() {
                     <span className="text-xs font-medium">{event.picker.name}</span>
                   </div>
                 </div>
-                <Button variant="ghost" size="sm" className="text-xs h-8 text-primary hover:text-primary hover:bg-primary/10">
-                  View Details
+                <Button asChild variant="ghost" size="sm" className="text-xs h-8 text-primary hover:text-primary hover:bg-primary/10">
+                  <Link href={`/event/${event.id}`}>View Details</Link>
                 </Button>
               </div>
             </CardFooter>

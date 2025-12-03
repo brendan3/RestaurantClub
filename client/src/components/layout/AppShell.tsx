@@ -1,18 +1,47 @@
 import { Link, useLocation } from "wouter";
+import { useState, useEffect } from "react";
 import { Home, Map, Users, User, MessageCircle, Plus, Camera } from "lucide-react";
 import { ASSETS } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useEventModal } from "@/lib/event-modal-context";
+import { getUpcomingEvents, type Event } from "@/lib/api";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { toast } = useToast();
+  const { setIsAddEventOpen } = useEventModal();
+  const [nextEvent, setNextEvent] = useState<Event | null>(null);
+
+  // Fetch next upcoming event for the sidebar
+  useEffect(() => {
+    const fetchNextEvent = async () => {
+      try {
+        const events = await getUpcomingEvents();
+        if (events.length > 0) {
+          setNextEvent(events[0]);
+        }
+      } catch (error) {
+        // Silently fail - user might not be logged in yet
+      }
+    };
+    fetchNextEvent();
+  }, [location]); // Refetch when location changes
 
   const handleComingSoon = (feature: string) => {
     toast({
       title: "Coming Soon! 🚀",
       description: `${feature} will be available in the next update.`,
     });
+  };
+
+  // Calculate days until event
+  const getDaysUntil = (dateString: string) => {
+    const eventDate = new Date(dateString);
+    const today = new Date();
+    const diffTime = eventDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
   };
 
   const navItems = [
@@ -42,12 +71,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
             {/* Desktop Add Event Button */}
             <div className="mb-6 hidden lg:block">
-                <Button onClick={() => handleComingSoon("Add Event")} className="w-full rounded-2xl font-bold shadow-soft hover:shadow-lg hover:-translate-y-1 transition-all bg-primary text-white h-12">
+                <Button onClick={() => setIsAddEventOpen(true)} className="w-full rounded-2xl font-bold shadow-soft hover:shadow-lg hover:-translate-y-1 transition-all bg-primary text-white h-12">
                     <Plus className="w-5 h-5 mr-2" /> Add Event
                 </Button>
             </div>
             <div className="mb-6 lg:hidden flex justify-center">
-                <Button onClick={() => handleComingSoon("Add Event")} size="icon" className="rounded-2xl font-bold shadow-soft bg-primary text-white h-10 w-10">
+                <Button onClick={() => setIsAddEventOpen(true)} size="icon" className="rounded-2xl font-bold shadow-soft bg-primary text-white h-10 w-10">
                     <Plus className="w-5 h-5" />
                 </Button>
             </div>
@@ -78,13 +107,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
             </nav>
 
-            <div className="mt-auto pt-6 border-t border-border/50 hidden lg:block">
-            <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10">
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Next Up</p>
-                <p className="text-sm font-bold text-foreground">La Trattoria</p>
-                <p className="text-xs text-primary font-medium mt-1">in 12 days</p>
-            </div>
-            </div>
+            {nextEvent && (
+              <div className="mt-auto pt-6 border-t border-border/50 hidden lg:block">
+                <Link href={`/event/${nextEvent.id}`}>
+                  <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10 hover:bg-primary/10 transition-colors cursor-pointer">
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Next Up</p>
+                    <p className="text-sm font-bold text-foreground">{nextEvent.restaurantName}</p>
+                    <p className="text-xs text-primary font-medium mt-1">
+                      in {getDaysUntil(nextEvent.eventDate)} day{getDaysUntil(nextEvent.eventDate) !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </Link>
+              </div>
+            )}
         </div>
       </aside>
 
@@ -102,7 +137,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
         <div className="flex items-center gap-3">
             {/* Header Add Button */}
-            <button onClick={() => handleComingSoon("Add Event")} className="w-9 h-9 rounded-full bg-primary text-white shadow-sm flex items-center justify-center active:scale-95 transition-transform">
+            <button onClick={() => setIsAddEventOpen(true)} className="w-9 h-9 rounded-full bg-primary text-white shadow-sm flex items-center justify-center active:scale-95 transition-transform">
                 <Plus className="w-5 h-5" />
             </button>
             <Link href="/profile">
