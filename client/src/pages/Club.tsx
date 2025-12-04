@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { SUPERLATIVES, ASSETS } from "@/lib/mockData";
 import { Link } from "wouter";
-import { Trophy, Crown, Utensils, Plus, ThumbsUp, Users as UsersIcon, Copy, Check, Share2, Mail, MessageCircle } from "lucide-react";
+import { Trophy, Crown, Plus, Users as UsersIcon, Copy, Check, Share2, Mail, MessageCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
   DialogContent,
@@ -14,23 +13,30 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { getUserClubs, type Club as ClubType } from "@/lib/api";
+import { getUserClubs, getWishlist, type Club as ClubType, type WishlistRestaurant } from "@/lib/api";
 import { toast } from "sonner";
+import { useEventModal } from "@/lib/event-modal-context";
 
 export default function Club() {
   const [clubs, setClubs] = useState<ClubType[]>([]);
+  const [wishlist, setWishlist] = useState<WishlistRestaurant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const { setIsAddEventOpen } = useEventModal();
 
   useEffect(() => {
-    loadClubs();
+    loadData();
   }, []);
 
-  const loadClubs = async () => {
+  const loadData = async () => {
     try {
-      const userClubs = await getUserClubs();
+      const [userClubs, wishlistData] = await Promise.all([
+        getUserClubs(),
+        getWishlist(),
+      ]);
       setClubs(userClubs);
+      setWishlist(wishlistData);
     } catch (error: any) {
       toast.error(error.message || "Failed to load clubs");
     } finally {
@@ -180,28 +186,34 @@ Sign up at the app and enter the code to join!`;
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-heading font-bold">Wishlist</h2>
-          <Button size="sm">Add Spot</Button>
+          <Button size="sm" onClick={() => setIsAddEventOpen(true)}>
+            <Plus className="w-4 h-4 mr-1" /> Plan Event
+          </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[
-            { name: "Sushi Nakazawa", votes: 4, type: "Japanese" },
-            { name: "Peter Luger", votes: 3, type: "Steakhouse" },
-            { name: "Carbone", votes: 2, type: "Italian" }
-          ].map((spot, i) => (
-            <div key={i} className="bg-card p-4 rounded-xl border shadow-sm flex justify-between items-center">
-              <div>
-                <p className="font-bold">{spot.name}</p>
-                <p className="text-xs text-muted-foreground">{spot.type}</p>
-              </div>
-              <div className="flex flex-col items-end">
-                <div className="flex items-center gap-1 text-sm font-medium text-primary">
-                  <ThumbsUp className="w-3 h-3" /> {spot.votes}
+        {wishlist.length === 0 ? (
+          <div className="bg-card p-8 rounded-xl border shadow-sm text-center">
+            <p className="text-muted-foreground mb-2">No saved restaurants yet</p>
+            <p className="text-xs text-muted-foreground">Add restaurants to your wishlist from event pages!</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {wishlist.slice(0, 6).map((spot) => (
+              <div key={spot.id} className="bg-card p-4 rounded-xl border shadow-sm flex justify-between items-center">
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold truncate">{spot.name}</p>
+                  {spot.cuisine && (
+                    <p className="text-xs text-muted-foreground">{spot.cuisine}</p>
+                  )}
                 </div>
-                <Progress value={spot.votes * 25} className="w-16 h-1 mt-1" />
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
+        {wishlist.length > 6 && (
+          <Button variant="ghost" size="sm" className="w-full text-primary">
+            View All ({wishlist.length})
+          </Button>
+        )}
       </div>
 
       {/* Invite Modal */}

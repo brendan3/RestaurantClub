@@ -9,7 +9,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { getEventById, updateEvent, getEventRsvps, getUserRsvp, rsvpToEvent } from "@/lib/api";
+import { getEventById, updateEvent, getEventRsvps, getUserRsvp, rsvpToEvent, addToWishlist } from "@/lib/api";
+import { Heart } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
 
@@ -38,6 +39,8 @@ export default function EventDetail() {
   // Photo upload state (client-side only for now)
   const [photos, setPhotos] = useState<PhotoPreview[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isAddingToWishlist, setIsAddingToWishlist] = useState(false);
+  const [addedToWishlist, setAddedToWishlist] = useState(false);
 
   useEffect(() => {
     if (eventId) {
@@ -155,6 +158,25 @@ export default function EventDetail() {
       }
       return prev.filter(p => p.id !== photoId);
     });
+  };
+
+  const handleAddToWishlist = async () => {
+    if (!event) return;
+    
+    setIsAddingToWishlist(true);
+    try {
+      await addToWishlist({
+        name: event.restaurantName,
+        cuisine: event.cuisine || null,
+        address: event.location || null,
+      });
+      setAddedToWishlist(true);
+      toast.success("Added to wishlist! 💖");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to add to wishlist");
+    } finally {
+      setIsAddingToWishlist(false);
+    }
   };
 
   // Cleanup previews on unmount
@@ -465,6 +487,17 @@ export default function EventDetail() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Add to Wishlist */}
+          <Button
+            variant="outline"
+            className="w-full rounded-full gap-2"
+            onClick={handleAddToWishlist}
+            disabled={isAddingToWishlist || addedToWishlist}
+          >
+            <Heart className={`w-4 h-4 ${addedToWishlist ? 'fill-red-500 text-red-500' : ''}`} />
+            {addedToWishlist ? "In Wishlist" : isAddingToWishlist ? "Adding..." : "Add to Wishlist"}
+          </Button>
 
           {/* Event Info */}
           <Card className="border-none shadow-soft bg-gradient-to-br from-card to-secondary/20">

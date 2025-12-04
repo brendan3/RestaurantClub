@@ -15,8 +15,9 @@ import {
 } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { useEventModal } from "@/lib/event-modal-context";
-import { getUpcomingEvents, getUserRsvp, rsvpToEvent, getEventRsvps, getUserClubs, type Event, type Club } from "@/lib/api";
+import { getUpcomingEvents, getUserRsvp, rsvpToEvent, getEventRsvps, getUserClubs, getWishlist, removeFromWishlist, type Event, type Club, type WishlistRestaurant } from "@/lib/api";
 import { toast } from "sonner";
+import { Trash2 } from "lucide-react";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -30,6 +31,7 @@ export default function Dashboard() {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [currentClub, setCurrentClub] = useState<Club | null>(null);
   const [copied, setCopied] = useState(false);
+  const [wishlist, setWishlist] = useState<WishlistRestaurant[]>([]);
 
   // Current event based on index
   const upcomingEvent = upcomingEvents.length > 0 ? upcomingEvents[currentIndex] : null;
@@ -53,12 +55,14 @@ export default function Dashboard() {
 
   const loadDashboardData = async () => {
     try {
-      const [events, clubs] = await Promise.all([
+      const [events, clubs, wishlistData] = await Promise.all([
         getUpcomingEvents(),
         getUserClubs(),
+        getWishlist(),
       ]);
       
       setUpcomingEvents(events);
+      setWishlist(wishlistData);
       
       if (clubs.length > 0) {
         setCurrentClub(clubs[0]);
@@ -171,6 +175,16 @@ Sign up at the app and enter the code to join!`;
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       toast.error("Failed to copy");
+    }
+  };
+
+  const handleRemoveFromWishlist = async (id: string) => {
+    try {
+      await removeFromWishlist(id);
+      setWishlist(prev => prev.filter(item => item.id !== id));
+      toast.success("Removed from wishlist");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to remove from wishlist");
     }
   };
 
@@ -522,21 +536,38 @@ Sign up at the app and enter the code to join!`;
 
           <div className="bg-white/60 backdrop-blur-sm rounded-[2rem] p-6 border border-white shadow-soft">
             <h3 className="font-heading font-bold text-xl mb-4 px-2">Wishlist</h3>
-            <ul className="space-y-2">
-              <li className="flex items-center justify-between p-3 hover:bg-white rounded-2xl transition-all duration-300 cursor-pointer group border border-transparent hover:border-border/50 hover:shadow-sm">
-                <span className="font-medium text-foreground/90">Mama's Ramen</span>
-                <Badge variant="secondary" className="text-[10px] bg-secondary text-secondary-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">Japanese</Badge>
-              </li>
-              <li className="flex items-center justify-between p-3 hover:bg-white rounded-2xl transition-all duration-300 cursor-pointer group border border-transparent hover:border-border/50 hover:shadow-sm">
-                <span className="font-medium text-foreground/90">The Golden Steer</span>
-                <Badge variant="secondary" className="text-[10px] bg-secondary text-secondary-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">Steakhouse</Badge>
-              </li>
-              <li className="flex items-center justify-between p-3 hover:bg-white rounded-2xl transition-all duration-300 cursor-pointer group border border-transparent hover:border-border/50 hover:shadow-sm">
-                <span className="font-medium text-foreground/90">Spice Route</span>
-                <Badge variant="secondary" className="text-[10px] bg-secondary text-secondary-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">Indian</Badge>
-              </li>
-            </ul>
-            <Button variant="ghost" size="sm" className="w-full mt-4 text-primary hover:bg-primary/5 rounded-xl font-bold">View All</Button>
+            {wishlist.length === 0 ? (
+              <div className="text-center py-6">
+                <p className="text-muted-foreground text-sm mb-2">No saved restaurants yet</p>
+                <p className="text-xs text-muted-foreground">Add restaurants to your wishlist from events!</p>
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {wishlist.slice(0, 5).map((item) => (
+                  <li key={item.id} className="flex items-center justify-between p-3 hover:bg-white rounded-2xl transition-all duration-300 group border border-transparent hover:border-border/50 hover:shadow-sm">
+                    <span className="font-medium text-foreground/90 truncate flex-1">{item.name}</span>
+                    <div className="flex items-center gap-2">
+                      {item.cuisine && (
+                        <Badge variant="secondary" className="text-[10px] bg-secondary text-secondary-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                          {item.cuisine}
+                        </Badge>
+                      )}
+                      <button 
+                        onClick={() => handleRemoveFromWishlist(item.id)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-100 rounded-full"
+                      >
+                        <Trash2 className="w-3 h-3 text-red-500" />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {wishlist.length > 5 && (
+              <Button variant="ghost" size="sm" className="w-full mt-4 text-primary hover:bg-primary/5 rounded-xl font-bold">
+                View All ({wishlist.length})
+              </Button>
+            )}
           </div>
         </div>
       </div>

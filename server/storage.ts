@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Event, type Club } from "@shared/schema";
+import { type User, type InsertUser, type Event, type Club, type WishlistRestaurant } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 // Storage interface for all CRUD operations
@@ -44,6 +44,18 @@ export interface IStorage {
     totalDinners: number;
     avgBill: number;
   }>;
+
+  // Wishlist methods
+  getWishlistForUser(userId: string): Promise<WishlistRestaurant[]>;
+  addWishlistRestaurant(input: {
+    userId: string;
+    name: string;
+    address?: string | null;
+    cuisine?: string | null;
+    placeId?: string | null;
+    imageUrl?: string | null;
+  }): Promise<WishlistRestaurant>;
+  removeWishlistRestaurant(id: string, userId: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -192,6 +204,19 @@ export class MemStorage implements IStorage {
       totalDinners: 14,
       avgBill: 45
     };
+  }
+
+  // Wishlist methods
+  async getWishlistForUser(): Promise<WishlistRestaurant[]> {
+    return [];
+  }
+
+  async addWishlistRestaurant(): Promise<WishlistRestaurant> {
+    throw new Error("Not implemented");
+  }
+
+  async removeWishlistRestaurant(): Promise<void> {
+    throw new Error("Not implemented");
   }
 }
 

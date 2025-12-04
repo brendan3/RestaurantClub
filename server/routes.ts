@@ -477,6 +477,209 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // WISHLIST ENDPOINTS
+  // ============================================
+
+  // Get user's wishlist
+  app.get("/api/wishlist", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.json([]);
+    }
+    
+    try {
+      const wishlist = await storage.getWishlistForUser(req.user!.id);
+      res.json(wishlist);
+    } catch (error) {
+      console.error("Error fetching wishlist:", error);
+      res.status(500).json({ error: "Failed to fetch wishlist" });
+    }
+  });
+
+  // Add to wishlist
+  app.post("/api/wishlist", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.json({ message: "Mock mode - wishlist not saved" });
+    }
+    
+    try {
+      const { name, address, cuisine, placeId, imageUrl } = req.body;
+      
+      if (!name || typeof name !== "string" || !name.trim()) {
+        return res.status(400).json({ error: "Restaurant name is required" });
+      }
+      
+      const wishlistItem = await storage.addWishlistRestaurant({
+        userId: req.user!.id,
+        name: name.trim(),
+        address: address?.trim() || null,
+        cuisine: cuisine?.trim() || null,
+        placeId: placeId?.trim() || null,
+        imageUrl: imageUrl?.trim() || null,
+      });
+      
+      res.json(wishlistItem);
+    } catch (error) {
+      console.error("Error adding to wishlist:", error);
+      res.status(500).json({ error: "Failed to add to wishlist" });
+    }
+  });
+
+  // Remove from wishlist
+  app.delete("/api/wishlist/:id", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.json({ message: "Mock mode - wishlist not modified" });
+    }
+    
+    try {
+      await storage.removeWishlistRestaurant(req.params.id, req.user!.id);
+      res.json({ message: "Removed from wishlist" });
+    } catch (error) {
+      console.error("Error removing from wishlist:", error);
+      res.status(500).json({ error: "Failed to remove from wishlist" });
+    }
+  });
+
+  // ============================================
+  // SOCIAL FEED ENDPOINT
+  // ============================================
+
+  // Get social feed (events from user's clubs)
+  app.get("/api/social/feed", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.json({ items: [] });
+    }
+    
+    try {
+      const clubs = await storage.getUserClubs(req.user!.id);
+      
+      if (clubs.length === 0) {
+        return res.json({ items: [] });
+      }
+      
+      // Gather events from all clubs
+      const feedItems: Array<{
+        id: string;
+        clubId: string;
+        clubName: string;
+        eventId: string;
+        eventName: string;
+        eventDate: string;
+        attendingCount: number;
+        maxSeats: number | null;
+        location: string | null;
+        cuisine: string;
+      }> = [];
+      
+      for (const club of clubs) {
+        // Get all events for this club (both upcoming and recent past)
+        const clubEvents = await storage.getEvents(club.id);
+        
+        // Take up to 10 most recent events per club
+        const recentEvents = clubEvents.slice(0, 10);
+        
+        for (const event of recentEvents) {
+          const rsvps = await storage.getEventRsvps(event.id);
+          const attendingCount = rsvps.filter(r => r.status === "attending").length;
+          
+          feedItems.push({
+            id: `${club.id}-${event.id}`,
+            clubId: club.id,
+            clubName: club.name,
+            eventId: event.id,
+            eventName: event.restaurantName,
+            eventDate: event.eventDate?.toISOString() || new Date().toISOString(),
+            attendingCount,
+            maxSeats: event.maxSeats,
+            location: event.location,
+            cuisine: event.cuisine,
+          });
+        }
+      }
+      
+      // Sort by event date descending (most recent first)
+      feedItems.sort((a, b) => new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime());
+      
+      res.json({ items: feedItems });
+    } catch (error) {
+      console.error("Error fetching social feed:", error);
+      res.status(500).json({ error: "Failed to fetch social feed" });
+    }
+  });
+
+  // ============================================
+  // NEARBY RESTAURANTS ENDPOINT (Google Places)
+  // ============================================
+
+  // Search nearby restaurants
+  app.get("/api/restaurants/nearby", auth.requireAuth, async (req, res) => {
+    const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+    
+    if (!apiKey) {
+      return res.status(501).json({ error: "Places API not configured" });
+    }
+    
+    try {
+      const { lat, lng, query } = req.query;
+      
+      if (!lat || !lng) {
+        return res.status(400).json({ error: "lat and lng are required" });
+      }
+      
+      const latitude = parseFloat(lat as string);
+      const longitude = parseFloat(lng as string);
+      
+      if (isNaN(latitude) || isNaN(longitude)) {
+        return res.status(400).json({ error: "Invalid lat/lng values" });
+      }
+      
+      // Use Google Places Nearby Search API
+      const baseUrl = "https://maps.googleapis.com/maps/api/place/nearbysearch/json";
+      const params = new URLSearchParams({
+        location: `${latitude},${longitude}`,
+        radius: "3000", // 3km radius
+        type: "restaurant",
+        key: apiKey,
+      });
+      
+      if (query && typeof query === "string" && query.trim()) {
+        params.set("keyword", query.trim());
+      }
+      
+      const response = await fetch(`${baseUrl}?${params.toString()}`);
+      
+      if (!response.ok) {
+        console.error("Google Places API error:", response.status, response.statusText);
+        return res.status(500).json({ error: "Failed to search restaurants" });
+      }
+      
+      const data = await response.json();
+      
+      if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+        console.error("Google Places API status:", data.status, data.error_message);
+        return res.status(500).json({ error: "Failed to search restaurants" });
+      }
+      
+      // Map to a lean response format
+      const places = (data.results || []).slice(0, 20).map((place: any) => ({
+        placeId: place.place_id,
+        name: place.name,
+        address: place.vicinity || place.formatted_address || "",
+        rating: place.rating || null,
+        priceLevel: place.price_level || null,
+        // Try to extract cuisine from types
+        cuisine: place.types?.find((t: string) => 
+          !["restaurant", "food", "point_of_interest", "establishment"].includes(t)
+        ) || null,
+      }));
+      
+      res.json({ places });
+    } catch (error) {
+      console.error("Error searching nearby restaurants:", error);
+      res.status(500).json({ error: "Failed to search restaurants" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

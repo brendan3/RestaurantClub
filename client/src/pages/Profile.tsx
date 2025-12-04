@@ -13,26 +13,42 @@ import {
 } from "@/components/ui/dialog";
 import { Settings, Award, Star, LogOut, Users, User, Bell, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { logout, getUserClubs, type Club } from "@/lib/api";
+import { logout, getUserClubs, getWishlist, removeFromWishlist, type Club, type WishlistRestaurant } from "@/lib/api";
 import { toast } from "sonner";
+import { Trash2, Heart } from "lucide-react";
 
 export default function Profile() {
   const { user, setUser } = useAuth();
   const [, setLocation] = useLocation();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [userClubs, setUserClubs] = useState<Club[]>([]);
+  const [wishlist, setWishlist] = useState<WishlistRestaurant[]>([]);
 
   useEffect(() => {
-    const loadClubs = async () => {
+    const loadData = async () => {
       try {
-        const clubs = await getUserClubs();
+        const [clubs, wishlistData] = await Promise.all([
+          getUserClubs(),
+          getWishlist(),
+        ]);
         setUserClubs(clubs);
+        setWishlist(wishlistData);
       } catch (error) {
         // Silently fail
       }
     };
-    loadClubs();
+    loadData();
   }, []);
+
+  const handleRemoveFromWishlist = async (id: string) => {
+    try {
+      await removeFromWishlist(id);
+      setWishlist(prev => prev.filter(item => item.id !== id));
+      toast.success("Removed from wishlist");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to remove from wishlist");
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -99,6 +115,39 @@ export default function Profile() {
             </Link>
          </Button>
       </div>
+
+      <Card className="border-none shadow-soft">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+             <Heart className="w-5 h-5 text-primary" />
+             My Wishlist
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {wishlist.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              No saved restaurants yet. Add some from events!
+            </p>
+          ) : (
+            wishlist.map((item) => (
+              <div key={item.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-xl group hover:bg-muted transition-colors">
+                <div className="flex-1">
+                  <p className="font-bold text-sm">{item.name}</p>
+                  {item.cuisine && (
+                    <p className="text-xs text-muted-foreground">{item.cuisine}</p>
+                  )}
+                </div>
+                <button 
+                  onClick={() => handleRemoveFromWishlist(item.id)}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-red-100 rounded-full"
+                >
+                  <Trash2 className="w-4 h-4 text-red-500" />
+                </button>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="border-none shadow-soft">
         <CardHeader>

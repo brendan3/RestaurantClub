@@ -1,15 +1,55 @@
-import { useState } from "react";
-import { PUBLIC_FEED, SOCIAL_FEED, DISCOVERABLE_CLUBS, ASSETS } from "@/lib/mockData";
+import { useState, useEffect } from "react";
+import { Link } from "wouter";
+import { PUBLIC_FEED, DISCOVERABLE_CLUBS, ASSETS } from "@/lib/mockData";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Heart, MessageSquare, Search, Users, Globe, Lock, Star, Trophy } from "lucide-react";
+import { Heart, MessageSquare, Search, Users, Globe, Lock, Star, Trophy, Calendar, MapPin, UtensilsCrossed } from "lucide-react";
+import { getSocialFeed, type SocialFeedItem } from "@/lib/api";
+import { toast } from "sonner";
 
 export default function Social() {
-  const [activeTab, setActiveTab] = useState("public");
+  const [activeTab, setActiveTab] = useState("my-clubs");
+  const [feedItems, setFeedItems] = useState<SocialFeedItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadFeed = async () => {
+      try {
+        const data = await getSocialFeed();
+        setFeedItems(data.items);
+      } catch (error: any) {
+        console.error("Failed to load social feed:", error);
+        if (!error.message?.includes("session")) {
+          toast.error("Failed to load feed");
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadFeed();
+  }, []);
+
+  const formatEventDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = date.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) {
+      return `${Math.abs(diffDays)} days ago`;
+    } else if (diffDays === 0) {
+      return "Today";
+    } else if (diffDays === 1) {
+      return "Tomorrow";
+    } else if (diffDays < 7) {
+      return `In ${diffDays} days`;
+    } else {
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -141,46 +181,73 @@ export default function Social() {
            <div className="bg-primary/5 border border-primary/10 rounded-xl p-4 flex items-center gap-3">
               <img src={ASSETS.mascot} className="w-12 h-12 object-contain" alt="Mascot" />
               <div>
-                <h3 className="font-bold text-primary">Restaurant Club Private Feed</h3>
-                <p className="text-xs text-muted-foreground">Only members of your club can see this.</p>
+                <h3 className="font-bold text-primary">Your Club Activity</h3>
+                <p className="text-xs text-muted-foreground">Events and updates from your clubs.</p>
               </div>
            </div>
 
-           {SOCIAL_FEED.map(post => (
-             <Card key={post.id} className="border-none shadow-soft">
-               <CardContent className="p-4">
-                 <div className="flex gap-3">
-                   <Avatar className="w-10 h-10">
-                     <AvatarImage src={post.user.avatar} />
-                     <AvatarFallback>{post.user.name[0]}</AvatarFallback>
-                   </Avatar>
-                   <div className="flex-1">
-                     <div className="flex justify-between items-start">
-                       <span className="font-bold text-sm">{post.user.name}</span>
-                       <span className="text-xs text-muted-foreground">{post.time}</span>
-                     </div>
-                     
-                     <p className="text-sm mt-1 text-foreground/90">{post.content}</p>
-                     
-                     {post.image && (
-                       <div className="mt-3 rounded-xl overflow-hidden">
-                          <img src={post.image} alt="Post" className="w-full h-56 object-cover hover:scale-105 transition-transform duration-500" />
-                       </div>
-                     )}
-
-                     <div className="flex gap-4 mt-3">
-                       <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors font-bold">
-                         <Heart className="w-4 h-4" /> {post.likes} Likes
-                       </button>
-                       <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors font-bold">
-                         <MessageSquare className="w-4 h-4" /> Reply
-                       </button>
-                     </div>
-                   </div>
-                 </div>
+           {isLoading ? (
+             <div className="text-center py-12">
+               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto"></div>
+               <p className="mt-4 text-muted-foreground">Loading feed...</p>
+             </div>
+           ) : feedItems.length === 0 ? (
+             <Card className="border-none shadow-soft">
+               <CardContent className="p-8 text-center">
+                 <UtensilsCrossed className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                 <h3 className="font-heading font-bold text-lg mb-2">No Activity Yet</h3>
+                 <p className="text-muted-foreground text-sm mb-4">
+                   Join a club or create some events to see activity here!
+                 </p>
+                 <Button asChild className="rounded-full">
+                   <Link href="/join">Join a Club</Link>
+                 </Button>
                </CardContent>
              </Card>
-           ))}
+           ) : (
+             feedItems.map(item => (
+               <Link key={item.id} href={`/event/${item.eventId}`}>
+                 <Card className="border-none shadow-soft hover:shadow-md transition-shadow cursor-pointer">
+                   <CardContent className="p-5">
+                     <div className="flex justify-between items-start mb-3">
+                       <Badge variant="secondary" className="text-xs">
+                         {item.clubName}
+                       </Badge>
+                       <span className="text-xs text-muted-foreground font-medium">
+                         {formatEventDate(item.eventDate)}
+                       </span>
+                     </div>
+                     
+                     <h3 className="font-heading font-bold text-lg mb-2">{item.eventName}</h3>
+                     
+                     <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+                       <span className="flex items-center gap-1">
+                         <Calendar className="w-4 h-4" />
+                         {new Date(item.eventDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                       </span>
+                       {item.location && (
+                         <span className="flex items-center gap-1">
+                           <MapPin className="w-4 h-4" />
+                           {item.location}
+                         </span>
+                       )}
+                       <span className="flex items-center gap-1">
+                         <Users className="w-4 h-4" />
+                         {item.attendingCount} attending
+                         {item.maxSeats && ` / ${item.maxSeats}`}
+                       </span>
+                     </div>
+                     
+                     {item.cuisine && (
+                       <Badge variant="outline" className="mt-3 text-xs">
+                         {item.cuisine}
+                       </Badge>
+                     )}
+                   </CardContent>
+                 </Card>
+               </Link>
+             ))
+           )}
         </div>
       )}
     </div>

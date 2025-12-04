@@ -309,6 +309,116 @@ export async function getUserRsvp(eventId: string): Promise<any | null> {
 }
 
 // ============================================
+// WISHLIST FUNCTIONS
+// ============================================
+
+export interface WishlistRestaurant {
+  id: string;
+  userId: string;
+  name: string;
+  address?: string | null;
+  cuisine?: string | null;
+  placeId?: string | null;
+  imageUrl?: string | null;
+  createdAt?: string;
+}
+
+/**
+ * Get user's wishlist
+ */
+export async function getWishlist(): Promise<WishlistRestaurant[]> {
+  return apiRequest<WishlistRestaurant[]>("/api/wishlist");
+}
+
+/**
+ * Add a restaurant to wishlist
+ */
+export async function addToWishlist(payload: {
+  name: string;
+  address?: string | null;
+  cuisine?: string | null;
+  placeId?: string | null;
+  imageUrl?: string | null;
+}): Promise<WishlistRestaurant> {
+  return apiRequest<WishlistRestaurant>("/api/wishlist", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * Remove a restaurant from wishlist
+ */
+export async function removeFromWishlist(id: string): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>(`/api/wishlist/${id}`, {
+    method: "DELETE",
+  });
+}
+
+// ============================================
+// SOCIAL FEED FUNCTIONS
+// ============================================
+
+export interface SocialFeedItem {
+  id: string;
+  clubId: string;
+  clubName: string;
+  eventId: string;
+  eventName: string;
+  eventDate: string;
+  attendingCount: number;
+  maxSeats: number | null;
+  location: string | null;
+  cuisine: string;
+}
+
+export interface SocialFeedResponse {
+  items: SocialFeedItem[];
+}
+
+/**
+ * Get social feed (events from user's clubs)
+ */
+export async function getSocialFeed(): Promise<SocialFeedResponse> {
+  return apiRequest<SocialFeedResponse>("/api/social/feed");
+}
+
+// ============================================
+// NEARBY RESTAURANTS FUNCTIONS
+// ============================================
+
+export interface NearbyPlace {
+  placeId: string;
+  name: string;
+  address: string;
+  rating?: number | null;
+  priceLevel?: number | null;
+  cuisine?: string | null;
+}
+
+export interface NearbyRestaurantsResponse {
+  places: NearbyPlace[];
+}
+
+/**
+ * Search nearby restaurants using Google Places
+ */
+export async function searchNearbyRestaurants(
+  lat: number, 
+  lng: number, 
+  query?: string
+): Promise<NearbyRestaurantsResponse> {
+  const params = new URLSearchParams({
+    lat: lat.toString(),
+    lng: lng.toString(),
+  });
+  if (query) {
+    params.set("query", query);
+  }
+  return apiRequest<NearbyRestaurantsResponse>(`/api/restaurants/nearby?${params.toString()}`);
+}
+
+// ============================================
 // HEALTH CHECK
 // ============================================
 

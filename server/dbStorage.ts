@@ -1,8 +1,8 @@
 import { eq, desc, asc, and } from "drizzle-orm";
 import { db } from "./db"; // <-- FIX 1: Import 'db' directly (not getDb)
 import { 
-  users, events, clubs, clubMembers, eventAttendees, eventTags,
-  type User, type InsertUser, type Event, type Club 
+  users, events, clubs, clubMembers, eventAttendees, eventTags, wishlistRestaurants,
+  type User, type InsertUser, type Event, type Club, type WishlistRestaurant 
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -294,5 +294,42 @@ export class DatabaseStorage implements IStorage {
       totalDinners,
       avgBill: Math.round(avgBill),
     };
+  }
+
+  // Wishlist methods
+  async getWishlistForUser(userId: string): Promise<WishlistRestaurant[]> {
+    return await db
+      .select()
+      .from(wishlistRestaurants)
+      .where(eq(wishlistRestaurants.userId, userId))
+      .orderBy(desc(wishlistRestaurants.createdAt));
+  }
+
+  async addWishlistRestaurant(input: {
+    userId: string;
+    name: string;
+    address?: string | null;
+    cuisine?: string | null;
+    placeId?: string | null;
+    imageUrl?: string | null;
+  }): Promise<WishlistRestaurant> {
+    const result = await db.insert(wishlistRestaurants).values({
+      userId: input.userId,
+      name: input.name,
+      address: input.address || null,
+      cuisine: input.cuisine || null,
+      placeId: input.placeId || null,
+      imageUrl: input.imageUrl || null,
+    }).returning();
+    return result[0];
+  }
+
+  async removeWishlistRestaurant(id: string, userId: string): Promise<void> {
+    await db
+      .delete(wishlistRestaurants)
+      .where(and(
+        eq(wishlistRestaurants.id, id),
+        eq(wishlistRestaurants.userId, userId)
+      ));
   }
 }

@@ -80,6 +80,18 @@ export const eventTags = pgTable("event_tags", {
   tag: text("tag").notNull(), // 'Fresh', 'Expensive', 'Quiet', etc.
 });
 
+// Wishlist restaurants (user-scoped)
+export const wishlistRestaurants = pgTable("wishlist_restaurants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  address: varchar("address", { length: 500 }),
+  cuisine: varchar("cuisine", { length: 100 }),
+  placeId: varchar("place_id", { length: 100 }), // Google Places ID if available
+  imageUrl: text("image_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   email: true,
@@ -120,6 +132,8 @@ export type Club = typeof clubs.$inferSelect;
 
 export type InsertEvent = z.infer<typeof insertEventSchema>;
 export type Event = typeof events.$inferSelect;
+
+export type WishlistRestaurant = typeof wishlistRestaurants.$inferSelect;
 
 export type SignupInput = z.infer<typeof signupSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
