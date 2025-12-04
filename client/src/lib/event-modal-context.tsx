@@ -1,10 +1,13 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useRef, useCallback, ReactNode } from "react";
 
 interface EventModalContextType {
   isAddEventOpen: boolean;
   setIsAddEventOpen: (open: boolean) => void;
   isInviteOpen: boolean;
   setIsInviteOpen: (open: boolean) => void;
+  // Callback that gets called when an event is created
+  onEventCreated: () => void;
+  setOnEventCreatedCallback: (callback: (() => void) | null) => void;
 }
 
 const EventModalContext = createContext<EventModalContextType | undefined>(undefined);
@@ -12,13 +15,24 @@ const EventModalContext = createContext<EventModalContextType | undefined>(undef
 export function EventModalProvider({ children }: { children: ReactNode }) {
   const [isAddEventOpen, setIsAddEventOpen] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const onEventCreatedRef = useRef<(() => void) | null>(null);
+
+  const setOnEventCreatedCallback = useCallback((callback: (() => void) | null) => {
+    onEventCreatedRef.current = callback;
+  }, []);
+
+  const onEventCreated = useCallback(() => {
+    onEventCreatedRef.current?.();
+  }, []);
 
   return (
     <EventModalContext.Provider value={{ 
       isAddEventOpen, 
       setIsAddEventOpen,
       isInviteOpen,
-      setIsInviteOpen
+      setIsInviteOpen,
+      onEventCreated,
+      setOnEventCreatedCallback,
     }}>
       {children}
     </EventModalContext.Provider>

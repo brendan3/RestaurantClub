@@ -1,16 +1,38 @@
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Settings, Award, Star, LogOut, Users } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Settings, Award, Star, LogOut, Users, User, Bell, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { logout } from "@/lib/api";
+import { logout, getUserClubs, type Club } from "@/lib/api";
 import { toast } from "sonner";
 
 export default function Profile() {
   const { user, setUser } = useAuth();
   const [, setLocation] = useLocation();
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [userClubs, setUserClubs] = useState<Club[]>([]);
+
+  useEffect(() => {
+    const loadClubs = async () => {
+      try {
+        const clubs = await getUserClubs();
+        setUserClubs(clubs);
+      } catch (error) {
+        // Silently fail
+      }
+    };
+    loadClubs();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -97,7 +119,11 @@ export default function Profile() {
       </Card>
 
       <div className="space-y-2">
-        <Button variant="outline" className="w-full justify-start h-12">
+        <Button 
+          variant="outline" 
+          className="w-full justify-start h-12"
+          onClick={() => setIsSettingsOpen(true)}
+        >
           <Settings className="w-4 h-4 mr-2" /> Settings
         </Button>
         <Button 
@@ -108,6 +134,86 @@ export default function Profile() {
           <LogOut className="w-4 h-4 mr-2" /> Sign Out
         </Button>
       </div>
+
+      {/* Settings Modal */}
+      <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+        <DialogContent className="sm:max-w-[450px] max-h-[90vh] rounded-[1.5rem] p-0 overflow-hidden flex flex-col">
+          <div className="bg-gradient-to-br from-muted/50 to-secondary/20 p-6 pb-4 shrink-0">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-heading font-bold flex items-center gap-2">
+                <Settings className="w-6 h-6 text-primary" />
+                Settings
+              </DialogTitle>
+              <DialogDescription className="text-muted-foreground">
+                Manage your account and preferences
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="p-6 pt-4 space-y-4 overflow-y-auto flex-1">
+            {/* Edit Profile */}
+            <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl hover:bg-muted/50 transition-colors cursor-not-allowed">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                  <User className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium">Edit Profile</p>
+                  <p className="text-xs text-muted-foreground">Update your name, photo, and info</p>
+                </div>
+              </div>
+              <Badge variant="secondary" className="text-xs">Coming soon</Badge>
+            </div>
+
+            {/* Notification Preferences */}
+            <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl hover:bg-muted/50 transition-colors cursor-not-allowed">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                  <Bell className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium">Notification Preferences</p>
+                  <p className="text-xs text-muted-foreground">Manage email and push notifications</p>
+                </div>
+              </div>
+              <Badge variant="secondary" className="text-xs">Coming soon</Badge>
+            </div>
+
+            {/* Manage Clubs */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-xl">
+                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                  <Users className="w-5 h-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium">My Clubs</p>
+                  <p className="text-xs text-muted-foreground">
+                    {userClubs.length === 0 
+                      ? "You're not in any clubs yet" 
+                      : `${userClubs.length} club${userClubs.length !== 1 ? 's' : ''}`}
+                  </p>
+                </div>
+              </div>
+              
+              {userClubs.length > 0 && (
+                <div className="pl-4 space-y-2">
+                  {userClubs.map((club) => (
+                    <Link key={club.id} href="/club" onClick={() => setIsSettingsOpen(false)}>
+                      <div className="flex items-center justify-between p-3 bg-white rounded-xl border border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-colors cursor-pointer">
+                        <div>
+                          <p className="font-medium text-sm">{club.name}</p>
+                          <p className="text-xs text-muted-foreground">{club.members} member{club.members !== 1 ? 's' : ''}</p>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -98,8 +98,8 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] rounded-[1.5rem] p-0 overflow-hidden">
-        <div className="bg-gradient-to-br from-primary/10 to-secondary/20 p-6 pb-4">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] rounded-[1.5rem] p-0 overflow-hidden flex flex-col">
+        <div className="bg-gradient-to-br from-primary/10 to-secondary/20 p-6 pb-4 shrink-0">
           <DialogHeader>
             <DialogTitle className="text-2xl font-heading font-bold flex items-center gap-2">
               <UtensilsCrossed className="w-6 h-6 text-primary" />
@@ -111,7 +111,7 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
           </DialogHeader>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 pt-4 space-y-5">
+        <form onSubmit={handleSubmit} className="p-6 pt-4 space-y-5 overflow-y-auto flex-1">
           {/* Restaurant Name */}
           <div className="space-y-2">
             <Label htmlFor="restaurantName" className="text-sm font-medium flex items-center gap-2">

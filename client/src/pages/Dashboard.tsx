@@ -17,11 +17,10 @@ import { useAuth } from "@/lib/auth-context";
 import { useEventModal } from "@/lib/event-modal-context";
 import { getUpcomingEvents, getUserRsvp, rsvpToEvent, getEventRsvps, getUserClubs, type Event, type Club } from "@/lib/api";
 import { toast } from "sonner";
-import AddEventModal from "@/components/AddEventModal";
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { isAddEventOpen, setIsAddEventOpen } = useEventModal();
+  const { setIsAddEventOpen, setOnEventCreatedCallback } = useEventModal();
   const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userRsvp, setUserRsvp] = useState<any>(null);
@@ -38,6 +37,12 @@ export default function Dashboard() {
   useEffect(() => {
     loadDashboardData();
   }, []);
+
+  // Register callback for when events are created from the global modal
+  useEffect(() => {
+    setOnEventCreatedCallback(loadDashboardData);
+    return () => setOnEventCreatedCallback(null);
+  }, [setOnEventCreatedCallback]);
 
   // Load RSVPs when current event changes
   useEffect(() => {
@@ -334,13 +339,6 @@ Sign up at the app and enter the code to join!`;
           </Button>
         </div>
       )}
-
-      {/* Add Event Modal */}
-      <AddEventModal
-        open={isAddEventOpen}
-        onOpenChange={setIsAddEventOpen}
-        onEventCreated={loadDashboardData}
-      />
 
       {/* Invite Modal */}
       <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
