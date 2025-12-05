@@ -388,12 +388,15 @@ export async function getSocialFeed(): Promise<SocialFeedResponse> {
 // ============================================
 
 export interface NearbyPlace {
-  placeId: string;
+  id: string;
   name: string;
   address: string;
-  rating?: number | null;
-  priceLevel?: number | null;
-  cuisine?: string | null;
+  primaryType?: string;
+  lat: number;
+  lng: number;
+  rating?: number;
+  priceLevel?: string;
+  googleMapsUrl?: string;
 }
 
 export interface NearbyRestaurantsResponse {
@@ -401,7 +404,7 @@ export interface NearbyRestaurantsResponse {
 }
 
 /**
- * Search nearby restaurants using Google Places
+ * Search nearby restaurants using Google Places API (New)
  */
 export async function searchNearbyRestaurants(
   lat: number, 

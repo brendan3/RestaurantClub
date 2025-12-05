@@ -133,7 +133,8 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
       } else if (error.message?.includes("Places API not configured")) {
         toast.info("Restaurant search not configured yet. You can still type a name manually.");
       } else {
-        toast.error(error.message || "Failed to search nearby restaurants.");
+        // Generic error - could be from Google API or network
+        toast.error("Couldn't load nearby restaurants. Please try again.");
       }
     } finally {
       setIsSearchingNearby(false);
@@ -141,11 +142,22 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
   };
 
   const handleSelectPlace = (place: NearbyPlace) => {
+    // Map primaryType to a more readable cuisine format
+    const formatCuisine = (primaryType?: string): string | undefined => {
+      if (!primaryType) return undefined;
+      // Convert snake_case to Title Case (e.g., "italian_restaurant" -> "Italian")
+      const cleaned = primaryType
+        .replace(/_restaurant$/, "")
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+      return cleaned;
+    };
+
     setFormData(prev => ({
       ...prev,
       restaurantName: place.name,
       location: place.address,
-      cuisine: place.cuisine || prev.cuisine,
+      cuisine: formatCuisine(place.primaryType) || prev.cuisine,
     }));
     setShowNearbyResults(false);
     setNearbyPlaces([]);
@@ -213,7 +225,7 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
               <div className="max-h-48 overflow-y-auto space-y-1 border border-border/50 rounded-xl bg-white">
                 {nearbyPlaces.map((place) => (
                   <button
-                    key={place.placeId}
+                    key={place.id}
                     type="button"
                     onClick={() => handleSelectPlace(place)}
                     className="w-full text-left p-3 hover:bg-primary/5 transition-colors border-b border-border/30 last:border-b-0"
