@@ -36,13 +36,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     });
   };
 
-  // Calculate days until event
+  // Calculate days until event (clamped to 0 minimum)
   const getDaysUntil = (dateString: string) => {
     const eventDate = new Date(dateString);
     const today = new Date();
+    // Reset both to start of day for accurate day comparison
+    eventDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
     const diffTime = eventDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    return Math.max(0, diffDays);
+  };
+
+  // Format days until label
+  const getDaysLabel = (days: number) => {
+    if (days === 0) return "Today!";
+    if (days === 1) return "in 1 day";
+    return `in ${days} days`;
   };
 
   const navItems = [
@@ -115,7 +125,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Next Up</p>
                     <p className="text-sm font-bold text-foreground">{nextEvent.restaurantName}</p>
                     <p className="text-xs text-primary font-medium mt-1">
-                      in {getDaysUntil(nextEvent.eventDate)} day{getDaysUntil(nextEvent.eventDate) !== 1 ? 's' : ''}
+                      {getDaysLabel(getDaysUntil(nextEvent.eventDate))}
                     </p>
                   </div>
                 </Link>

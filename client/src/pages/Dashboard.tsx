@@ -135,9 +135,19 @@ export default function Dashboard() {
   const calculateDaysUntil = (dateString: string) => {
     const eventDate = new Date(dateString);
     const today = new Date();
+    // Reset both to start of day for accurate day comparison
+    eventDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
     const diffTime = eventDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    // Clamp to 0 minimum (shouldn't show negative days)
+    return Math.max(0, diffDays);
+  };
+
+  const getDaysUntilLabel = (days: number) => {
+    if (days === 0) return "Today";
+    if (days === 1) return "1 day left";
+    return `${days} days left`;
   };
 
   const attendingCount = eventRsvps.filter(r => r.status === "attending").length;
@@ -307,10 +317,21 @@ Sign up at the app and enter the code to join!`;
 
             <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-5 rounded-[2rem] text-center min-w-[140px] shadow-lg">
               <span className="block text-xs text-white/80 uppercase tracking-wider font-bold mb-1">Countdown</span>
-              <span className="block text-5xl font-heading font-black text-white">
-                {calculateDaysUntil(upcomingEvent.eventDate)}
-              </span>
-              <span className="block text-sm font-medium text-white/80 mb-3">days left</span>
+              {calculateDaysUntil(upcomingEvent.eventDate) === 0 ? (
+                <>
+                  <span className="block text-3xl font-heading font-black text-white mt-2">🎉</span>
+                  <span className="block text-lg font-bold text-white mb-3">Today!</span>
+                </>
+              ) : (
+                <>
+                  <span className="block text-5xl font-heading font-black text-white">
+                    {calculateDaysUntil(upcomingEvent.eventDate)}
+                  </span>
+                  <span className="block text-sm font-medium text-white/80 mb-3">
+                    {calculateDaysUntil(upcomingEvent.eventDate) === 1 ? "day left" : "days left"}
+                  </span>
+                </>
+              )}
               
               {userRsvp?.status === "attending" ? (
                 <div className="space-y-2">

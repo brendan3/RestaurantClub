@@ -1,4 +1,4 @@
-import { eq, desc, asc, and } from "drizzle-orm";
+import { eq, desc, asc, and, gte, lt } from "drizzle-orm";
 import { db } from "./db"; // <-- FIX 1: Import 'db' directly (not getDb)
 import { 
   users, events, clubs, clubMembers, eventAttendees, eventTags, wishlistRestaurants,
@@ -67,11 +67,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUpcomingEvents(clubId?: string): Promise<Event[]> {
-    // if (!this.db) return [];
+    // Filter by eventDate >= now (start of today to include today's events)
+    const now = new Date();
+    now.setHours(0, 0, 0, 0); // Start of today
     
     const conditions = clubId
-      ? and(eq(events.status, "confirmed"), eq(events.clubId, clubId))
-      : eq(events.status, "confirmed");
+      ? and(gte(events.eventDate, now), eq(events.clubId, clubId))
+      : gte(events.eventDate, now);
     
     return await db
       .select()
@@ -81,11 +83,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPastEvents(clubId?: string): Promise<Event[]> {
-    // if (!this.db) return [];
+    // Filter by eventDate < start of today
+    const now = new Date();
+    now.setHours(0, 0, 0, 0); // Start of today
     
     const conditions = clubId
-      ? and(eq(events.status, "past"), eq(events.clubId, clubId))
-      : eq(events.status, "past");
+      ? and(lt(events.eventDate, now), eq(events.clubId, clubId))
+      : lt(events.eventDate, now);
     
     return await db
       .select()

@@ -544,7 +544,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // SOCIAL FEED ENDPOINT
   // ============================================
 
-  // Get social feed (events from user's clubs)
+  // Get social feed (upcoming events from user's clubs, sorted soonest first)
   app.get("/api/social/feed", auth.requireAuth, async (req, res) => {
     if (useMockData) {
       return res.json({ items: [] });
@@ -557,7 +557,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ items: [] });
       }
       
-      // Gather events from all clubs
+      // Gather upcoming events from all clubs
       const feedItems: Array<{
         id: string;
         clubId: string;
@@ -572,13 +572,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }> = [];
       
       for (const club of clubs) {
-        // Get all events for this club (both upcoming and recent past)
-        const clubEvents = await storage.getEvents(club.id);
+        // Get only upcoming events for this club (already filtered by date >= today)
+        const clubEvents = await storage.getUpcomingEvents(club.id);
         
-        // Take up to 10 most recent events per club
-        const recentEvents = clubEvents.slice(0, 10);
+        // Take up to 10 upcoming events per club
+        const upcomingEvents = clubEvents.slice(0, 10);
         
-        for (const event of recentEvents) {
+        for (const event of upcomingEvents) {
           const rsvps = await storage.getEventRsvps(event.id);
           const attendingCount = rsvps.filter(r => r.status === "attending").length;
           
@@ -597,8 +597,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Sort by event date descending (most recent first)
-      feedItems.sort((a, b) => new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime());
+      // Sort by event date ascending (soonest first)
+      feedItems.sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
       
       res.json({ items: feedItems });
     } catch (error) {
