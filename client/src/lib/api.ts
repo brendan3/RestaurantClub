@@ -250,7 +250,7 @@ export async function getEventById(id: string): Promise<Event> {
  */
 export async function createEvent(eventData: {
   restaurantName: string;
-  cuisine: string;
+  cuisine?: string;
   eventDate: string;
   location?: string;
   notes?: string;
@@ -405,20 +405,33 @@ export interface NearbyRestaurantsResponse {
 
 /**
  * Search nearby restaurants using Google Places API (New)
+ * Used when user wants to see what's nearby without a specific query
  */
 export async function searchNearbyRestaurants(
   lat: number, 
-  lng: number, 
-  query?: string
+  lng: number
 ): Promise<NearbyRestaurantsResponse> {
   const params = new URLSearchParams({
     lat: lat.toString(),
     lng: lng.toString(),
   });
-  if (query) {
-    params.set("query", query);
-  }
   return apiRequest<NearbyRestaurantsResponse>(`/api/restaurants/nearby?${params.toString()}`);
+}
+
+/**
+ * Search restaurants by text query (cuisine type or restaurant name)
+ * Uses Google Places API (New) text search with optional location bias
+ */
+export async function searchRestaurants(
+  query: string,
+  lat?: number,
+  lng?: number
+): Promise<NearbyPlace[]> {
+  const response = await apiRequest<NearbyRestaurantsResponse>("/api/restaurants/search", {
+    method: "POST",
+    body: JSON.stringify({ query, lat, lng }),
+  });
+  return response.places;
 }
 
 // ============================================

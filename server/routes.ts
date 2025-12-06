@@ -265,9 +265,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { restaurantName, cuisine, eventDate, location, notes, maxSeats, imageUrl } = req.body;
       
-      if (!restaurantName || !cuisine || !eventDate) {
+      if (!restaurantName || !eventDate) {
         return res.status(400).json({ 
-          error: "Restaurant name, cuisine, and date are required" 
+          error: "Restaurant name and date are required" 
         });
       }
       
@@ -290,7 +290,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const event = await storage.createEvent({
         clubId: clubs[0].id,
         restaurantName,
-        cuisine,
+        cuisine: cuisine || "Restaurant",
         eventDate: new Date(eventDate),
         location: location || null,
         notes: notes || null,
@@ -725,6 +725,123 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ places });
     } catch (error) {
       console.error("[Places API] Error searching nearby restaurants:", error);
+      res.status(500).json({ error: "Failed to search restaurants" });
+    }
+  });
+
+  // ============================================
+  // TEXT SEARCH RESTAURANTS ENDPOINT (Google Places API New)
+  // ============================================
+
+  // Search restaurants by text query (cuisine type or restaurant name)
+  app.post("/api/restaurants/search", auth.requireAuth, async (req, res) => {
+    const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+    
+    if (!apiKey) {
+      return res.status(501).json({ error: "Restaurant search not configured yet. You can still type a name manually." });
+    }
+    
+    try {
+      const { query, lat, lng } = req.body;
+      
+      // Validate query
+      if (!query || typeof query !== "string" || !query.trim()) {
+        return res.status(400).json({ error: "Query is required" });
+      }
+      
+      const trimmedQuery = query.trim();
+      
+      // Use Google Places API (New) - places:searchText
+      const baseUrl = "https://places.googleapis.com/v1/places:searchText";
+      
+      // Build the request body
+      const requestBody: any = {
+        textQuery: trimmedQuery,
+        includedType: "restaurant",
+        maxResultCount: 10,
+      };
+      
+      // Add location bias if lat/lng are provided
+      if (lat !== undefined && lng !== undefined) {
+        const latitude = parseFloat(lat);
+        const longitude = parseFloat(lng);
+        
+        if (!isNaN(latitude) && !isNaN(longitude)) {
+          requestBody.locationBias = {
+            circle: {
+              center: {
+                latitude: latitude,
+                longitude: longitude,
+              },
+              radius: 3000.0, // 3km radius
+            },
+          };
+        }
+      }
+      
+      // Dev logging
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Places Text Search] Calling:", baseUrl);
+        console.log("[Places Text Search] Request body:", JSON.stringify(requestBody, null, 2));
+      }
+      
+      const response = await fetch(baseUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": apiKey,
+          "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.primaryType,places.location,places.rating,places.priceLevel,places.googleMapsUri",
+        },
+        body: JSON.stringify(requestBody),
+      });
+      
+      // Dev logging
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Places Text Search] Response status:", response.status);
+      }
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        if (process.env.NODE_ENV === "development") {
+          console.error("[Places Text Search] HTTP error:", response.status, response.statusText);
+          console.error("[Places Text Search] Error body:", errorText);
+        }
+        return res.status(500).json({ error: "Failed to search restaurants" });
+      }
+      
+      const data = await response.json();
+      
+      // Dev logging
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Places Text Search] Response places count:", data.places?.length || 0);
+      }
+      
+      // Check for API-level errors
+      if (data.error) {
+        if (process.env.NODE_ENV === "development") {
+          console.error("[Places Text Search] API error:", data.error.message, data.error.status);
+        }
+        return res.status(500).json({ error: "Failed to search restaurants" });
+      }
+      
+      // Map to our clean DTO format (same as nearby endpoint)
+      const places: NearbyRestaurant[] = (data.places || []).map((place: any) => ({
+        id: place.id || "",
+        name: place.displayName?.text || "Unknown",
+        address: place.formattedAddress || "",
+        primaryType: place.primaryType || undefined,
+        lat: place.location?.latitude || 0,
+        lng: place.location?.longitude || 0,
+        rating: place.rating || undefined,
+        priceLevel: place.priceLevel || undefined,
+        googleMapsUrl: place.googleMapsUri || undefined,
+      }));
+      
+      res.json({ places });
+    } catch (error) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("[Places Text Search] Error searching restaurants:", error);
+      }
       res.status(500).json({ error: "Failed to search restaurants" });
     }
   });

@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { createEvent, searchNearbyRestaurants, type NearbyPlace } from "@/lib/api";
+import { createEvent, searchNearbyRestaurants, searchRestaurants, type NearbyPlace } from "@/lib/api";
 import { toast } from "sonner";
 
 interface AddEventModalProps {
@@ -46,10 +46,6 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
       toast.error("Restaurant name is required");
       return;
     }
-    if (!formData.cuisine.trim()) {
-      toast.error("Cuisine type is required");
-      return;
-    }
     if (!formData.date) {
       toast.error("Date is required");
       return;
@@ -62,7 +58,7 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
       
       await createEvent({
         restaurantName: formData.restaurantName.trim(),
-        cuisine: formData.cuisine.trim(),
+        cuisine: formData.cuisine.trim() || undefined,
         eventDate: eventDateTime.toISOString(),
         location: formData.location.trim() || undefined,
         notes: formData.notes.trim() || undefined,
@@ -97,44 +93,99 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
     setFormData(prev => ({ ...prev, [field]: e.target.value }));
   };
 
+  // Build a search query from the form fields and search input
+  const buildRestaurantQuery = (): string => {
+    const parts: string[] = [];
+    
+    // Add the search box query first (most specific)
+    if (searchQuery.trim()) {
+      parts.push(searchQuery.trim());
+    }
+    
+    // Add restaurant name if entered
+    if (formData.restaurantName.trim()) {
+      parts.push(formData.restaurantName.trim());
+    }
+    
+    // Add cuisine type if entered
+    if (formData.cuisine.trim()) {
+      parts.push(formData.cuisine.trim());
+    }
+    
+    return parts.join(" ").trim();
+  };
+
   const handleSearchNearby = async () => {
     setIsSearchingNearby(true);
     setNearbyPlaces([]);
     
+    const query = buildRestaurantQuery();
+    
     try {
-      // Get user's current location
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 60000,
-        });
-      });
-
-      const { latitude, longitude } = position.coords;
-      const result = await searchNearbyRestaurants(latitude, longitude, searchQuery || undefined);
+      let places: NearbyPlace[];
+      let latitude: number | undefined;
+      let longitude: number | undefined;
       
-      setNearbyPlaces(result.places);
+      // Try to get user's location (optional for text search)
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 60000,
+          });
+        });
+        latitude = position.coords.latitude;
+        longitude = position.coords.longitude;
+      } catch (geoError: any) {
+        // If we have a query, we can still do text search without location
+        if (query) {
+          // Location failed but we have a query - proceed without location bias
+          if (geoError.code === 1) {
+            toast.info("Location access denied. Searching without location bias.");
+          }
+          // Continue without lat/lng
+        } else {
+          // No query and no location - can't do anything
+          if (geoError.code === 1) {
+            toast.error("Location access denied. Please enable location permissions or enter a search term.");
+          } else if (geoError.code === 2) {
+            toast.error("Couldn't determine your location. Please try again or enter a search term.");
+          } else if (geoError.code === 3) {
+            toast.error("Location request timed out. Please try again or enter a search term.");
+          }
+          setIsSearchingNearby(false);
+          return;
+        }
+      }
+      
+      // Decide which API to use based on whether we have a query
+      if (query) {
+        // Use text search with optional location bias
+        places = await searchRestaurants(query, latitude, longitude);
+      } else {
+        // Use nearby search (requires location)
+        if (latitude === undefined || longitude === undefined) {
+          toast.error("Location is required for nearby search. Please enter a search term or allow location access.");
+          setIsSearchingNearby(false);
+          return;
+        }
+        const result = await searchNearbyRestaurants(latitude, longitude);
+        places = result.places;
+      }
+      
+      setNearbyPlaces(places);
       setShowNearbyResults(true);
       
-      if (result.places.length === 0) {
-        toast.info("No restaurants found nearby. Try a different search term.");
+      if (places.length === 0) {
+        toast.info("No restaurants found. Try a different search term.");
       }
     } catch (error: any) {
-      if (error.code === 1) {
-        // Permission denied
-        toast.error("Location access denied. Please enable location permissions.");
-      } else if (error.code === 2) {
-        // Position unavailable
-        toast.error("Couldn't determine your location. Please try again.");
-      } else if (error.code === 3) {
-        // Timeout
-        toast.error("Location request timed out. Please try again.");
-      } else if (error.message?.includes("Places API not configured")) {
+      if (error.message?.includes("not configured")) {
         toast.info("Restaurant search not configured yet. You can still type a name manually.");
       } else {
         // Generic error - could be from Google API or network
-        toast.error("Couldn't load nearby restaurants. Please try again.");
+        toast.error("Couldn't load restaurants. Please try again.");
       }
     } finally {
       setIsSearchingNearby(false);
@@ -190,11 +241,14 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
           <div className="space-y-3 p-4 bg-muted/50 rounded-xl border border-border/50">
             <Label className="text-sm font-medium flex items-center gap-2">
               <Navigation className="w-4 h-4 text-primary" />
-              Find Nearby Restaurants
+              Find Restaurants
             </Label>
+            <p className="text-xs text-muted-foreground -mt-1">
+              Search by name or cuisine, or leave empty to see what's nearby
+            </p>
             <div className="flex gap-2">
               <Input
-                placeholder="Search cuisine or name..."
+                placeholder="e.g., mexican, sushi, La Trattoria..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="rounded-xl h-10 flex-1"
@@ -272,7 +326,7 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
           {/* Cuisine */}
           <div className="space-y-2">
             <Label htmlFor="cuisine" className="text-sm font-medium">
-              Cuisine Type *
+              Cuisine Type
             </Label>
             <Input
               id="cuisine"
