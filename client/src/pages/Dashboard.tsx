@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { SOCIAL_FEED, ASSETS } from "@/lib/mockData";
-import { Calendar, Clock, MapPin, MessageSquare, Heart, Share2, ChefHat, Check, X, Plus, ExternalLink, ChevronLeft, ChevronRight, Copy, Mail, MessageCircle as MessageCircleIcon } from "lucide-react";
+import { Calendar, Clock, MapPin, MessageSquare, Heart, Share2, ChefHat, Check, X, Plus, ExternalLink, ChevronLeft, ChevronRight, Copy, Mail, MessageCircle as MessageCircleIcon, Utensils, CheckCircle2, History } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -15,12 +15,13 @@ import {
 } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { useEventModal } from "@/lib/event-modal-context";
-import { getUpcomingEvents, getUserRsvp, rsvpToEvent, getEventRsvps, getUserClubs, getWishlist, removeFromWishlist, type Event, type Club, type WishlistRestaurant } from "@/lib/api";
+import { getUpcomingEvents, getPastEvents, getUserRsvp, rsvpToEvent, getEventRsvps, getUserClubs, getWishlist, removeFromWishlist, getEventImageUrl, type Event, type Club, type WishlistRestaurant } from "@/lib/api";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const [, navigate] = useLocation();
   const { setIsAddEventOpen, setOnEventCreatedCallback } = useEventModal();
   const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -32,6 +33,8 @@ export default function Dashboard() {
   const [currentClub, setCurrentClub] = useState<Club | null>(null);
   const [copied, setCopied] = useState(false);
   const [wishlist, setWishlist] = useState<WishlistRestaurant[]>([]);
+  const [pastEvents, setPastEvents] = useState<Event[]>([]);
+  const [allUserRsvps, setAllUserRsvps] = useState<Map<string, any>>(new Map());
 
   // Current event based on index
   const upcomingEvent = upcomingEvents.length > 0 ? upcomingEvents[currentIndex] : null;
@@ -55,14 +58,16 @@ export default function Dashboard() {
 
   const loadDashboardData = async () => {
     try {
-      const [events, clubs, wishlistData] = await Promise.all([
+      const [events, clubs, wishlistData, pastEventsData] = await Promise.all([
         getUpcomingEvents(),
         getUserClubs(),
         getWishlist(),
+        getPastEvents(),
       ]);
       
       setUpcomingEvents(events);
       setWishlist(wishlistData);
+      setPastEvents(pastEventsData);
       
       if (clubs.length > 0) {
         setCurrentClub(clubs[0]);
@@ -71,6 +76,22 @@ export default function Dashboard() {
       if (events.length > 0) {
         // Load RSVPs for the first event
         await loadEventRsvps(events[0].id);
+        
+        // Load user RSVPs for all upcoming events to determine pending decisions
+        const rsvpPromises = events.map(async (event) => {
+          try {
+            const rsvp = await getUserRsvp(event.id);
+            return { eventId: event.id, rsvp };
+          } catch {
+            return { eventId: event.id, rsvp: null };
+          }
+        });
+        const rsvpResults = await Promise.all(rsvpPromises);
+        const rsvpMap = new Map<string, any>();
+        rsvpResults.forEach(({ eventId, rsvp }) => {
+          rsvpMap.set(eventId, rsvp);
+        });
+        setAllUserRsvps(rsvpMap);
       }
     } catch (error: any) {
       console.error("Failed to load dashboard data:", error);
@@ -198,6 +219,35 @@ Sign up at the app and enter the code to join!`;
     }
   };
 
+  // "What's Next" helpers
+  const nextEvent = upcomingEvents.length > 0 ? upcomingEvents[0] : null;
+  const lastEvent = pastEvents.length > 0 ? pastEvents[0] : null;
+  
+  // Count events needing RSVP decision (no RSVP or status is null/undefined)
+  const eventsNeedingRsvp = upcomingEvents.filter(event => {
+    const rsvp = allUserRsvps.get(event.id);
+    return !rsvp || !rsvp.status;
+  });
+  const pendingDecisionCount = eventsNeedingRsvp.length;
+  const firstEventNeedingRsvp = eventsNeedingRsvp.length > 0 ? eventsNeedingRsvp[0] : null;
+
+  const formatCompactDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      weekday: 'short', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  };
+
+  const formatCompactTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit' 
+    });
+  };
+
   return (
     <div className="space-y-8">
       {/* Welcome Header */}
@@ -237,7 +287,7 @@ Sign up at the app and enter the code to join!`;
         <div className="relative overflow-hidden rounded-[2.5rem] bg-foreground text-background shadow-float group">
           <div className="absolute inset-0">
             <img 
-              src={upcomingEvent.imageUrl || "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1000&q=80"} 
+              src={getEventImageUrl(upcomingEvent, 1200)} 
               alt="Next Event" 
               className="w-full h-full object-cover opacity-50 group-hover:scale-105 transition-transform duration-1000 ease-out" 
             />
@@ -372,6 +422,113 @@ Sign up at the app and enter the code to join!`;
             <Plus className="w-4 h-4 mr-2" />
             Create Event
           </Button>
+        </div>
+      )}
+
+      {/* What's Next Section */}
+      {!isLoading && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Card 1: Next Dinner */}
+          <div
+            onClick={() => {
+              if (nextEvent) {
+                navigate(`/event/${nextEvent.id}`);
+              } else {
+                setIsAddEventOpen(true);
+              }
+            }}
+            className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-white/50 shadow-soft cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 group"
+          >
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 bg-primary/10 rounded-xl group-hover:bg-primary/20 transition-colors">
+                <Utensils className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Next Dinner</p>
+                {nextEvent ? (
+                  <>
+                    <p className="font-heading font-bold text-foreground truncate">{nextEvent.restaurantName}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {formatCompactDate(nextEvent.eventDate)} · {formatCompactTime(nextEvent.eventDate)}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium text-foreground">No dinners planned</p>
+                    <p className="text-sm text-primary font-medium">Create one →</p>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Your Actions */}
+          <div
+            onClick={() => {
+              if (firstEventNeedingRsvp) {
+                navigate(`/event/${firstEventNeedingRsvp.id}`);
+              } else {
+                navigate('/social');
+              }
+            }}
+            className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-white/50 shadow-soft cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 group"
+          >
+            <div className="flex items-start gap-3">
+              <div className={`p-2.5 rounded-xl transition-colors ${
+                pendingDecisionCount > 0 
+                  ? 'bg-amber-100 group-hover:bg-amber-200' 
+                  : 'bg-green-100 group-hover:bg-green-200'
+              }`}>
+                <CheckCircle2 className={`w-5 h-5 ${
+                  pendingDecisionCount > 0 ? 'text-amber-600' : 'text-green-600'
+                }`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Your Actions</p>
+                {pendingDecisionCount > 0 ? (
+                  <>
+                    <p className="font-heading font-bold text-foreground">
+                      {pendingDecisionCount} dinner{pendingDecisionCount !== 1 ? 's' : ''} to decide on
+                    </p>
+                    <p className="text-sm text-amber-600 font-medium">RSVP needed →</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium text-foreground">You're all set!</p>
+                    <p className="text-sm text-muted-foreground">No decisions pending</p>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Last Dinner */}
+          <div
+            onClick={() => navigate('/history')}
+            className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-white/50 shadow-soft cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 group"
+          >
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 bg-secondary/50 rounded-xl group-hover:bg-secondary/70 transition-colors">
+                <History className="w-5 h-5 text-foreground/70" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Last Dinner</p>
+                {lastEvent ? (
+                  <>
+                    <p className="font-heading font-bold text-foreground truncate">{lastEvent.restaurantName}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {formatCompactDate(lastEvent.eventDate)}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium text-foreground">No past dinners yet</p>
+                    <p className="text-sm text-muted-foreground">Your history will appear here</p>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

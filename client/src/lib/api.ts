@@ -26,6 +26,9 @@ export interface Event {
   totalBill?: number | null;
   pickerId: string;
   imageUrl?: string | null;
+  // Google Places integration
+  placeId?: string | null;
+  placePhotoName?: string | null;
   createdAt?: string;
   // Legacy fields for backward compatibility with mock data
   restaurant?: string;
@@ -256,6 +259,8 @@ export async function createEvent(eventData: {
   notes?: string;
   maxSeats?: number;
   imageUrl?: string;
+  placeId?: string | null;
+  placePhotoName?: string | null;
 }): Promise<Event> {
   return apiRequest<Event>("/api/events", {
     method: "POST",
@@ -397,6 +402,33 @@ export interface NearbyPlace {
   rating?: number;
   priceLevel?: string;
   googleMapsUrl?: string;
+  photoName?: string; // Google Places photo reference for proxied loading
+}
+
+/**
+ * Get the URL for a restaurant photo (proxied through our backend)
+ * Returns undefined if no photoName is available
+ */
+export function getRestaurantPhotoUrl(photoName?: string, maxWidth: number = 400): string | undefined {
+  if (!photoName) return undefined;
+  return `/api/restaurants/photo?name=${encodeURIComponent(photoName)}&maxWidth=${maxWidth}`;
+}
+
+/**
+ * Get the image URL for an event, using Google Places photo if available,
+ * otherwise falling back to the event's imageUrl or a default placeholder
+ */
+export function getEventImageUrl(event: Event, maxWidth: number = 1200): string {
+  // Priority 1: Google Places photo
+  if (event.placePhotoName) {
+    return `/api/restaurants/photo?name=${encodeURIComponent(event.placePhotoName)}&maxWidth=${maxWidth}`;
+  }
+  // Priority 2: Custom image URL on the event
+  if (event.imageUrl) {
+    return event.imageUrl;
+  }
+  // Priority 3: Default placeholder
+  return "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1000&q=80";
 }
 
 export interface NearbyRestaurantsResponse {

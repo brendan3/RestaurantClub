@@ -61,6 +61,9 @@ export const events = pgTable("events", {
   totalBill: integer("total_bill"),
   pickerId: varchar("picker_id").notNull().references(() => users.id),
   imageUrl: text("image_url"),
+  // Google Places integration
+  placeId: varchar("place_id", { length: 255 }), // Google Places ID
+  placePhotoName: varchar("place_photo_name", { length: 512 }), // Google Places photo reference
   createdAt: timestamp("created_at").defaultNow(),
 });
 

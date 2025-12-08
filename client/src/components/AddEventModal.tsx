@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { createEvent, searchNearbyRestaurants, searchRestaurants, type NearbyPlace } from "@/lib/api";
+import { createEvent, searchNearbyRestaurants, searchRestaurants, getRestaurantPhotoUrl, type NearbyPlace } from "@/lib/api";
 import { toast } from "sonner";
 
 interface AddEventModalProps {
@@ -38,6 +38,9 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
   const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[]>([]);
   const [showNearbyResults, setShowNearbyResults] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // Selected Google Place info (for photo persistence)
+  const [selectedPlace, setSelectedPlace] = useState<{ placeId: string; photoName?: string } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,6 +66,8 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
         location: formData.location.trim() || undefined,
         notes: formData.notes.trim() || undefined,
         maxSeats: formData.maxSeats ? parseInt(formData.maxSeats, 10) : undefined,
+        placeId: selectedPlace?.placeId || null,
+        placePhotoName: selectedPlace?.photoName || null,
       });
 
       toast.success("Event created! 🎉");
@@ -77,6 +82,7 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
         notes: "",
         maxSeats: "",
       });
+      setSelectedPlace(null);
       
       onOpenChange(false);
       onEventCreated?.();
@@ -91,6 +97,10 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     setFormData(prev => ({ ...prev, [field]: e.target.value }));
+    // Clear selected place if user manually edits restaurant name
+    if (field === "restaurantName") {
+      setSelectedPlace(null);
+    }
   };
 
   // Build a search query from the form fields and search input
@@ -210,6 +220,13 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
       location: place.address,
       cuisine: formatCuisine(place.primaryType) || prev.cuisine,
     }));
+    
+    // Capture Google Places info for photo persistence
+    setSelectedPlace({
+      placeId: place.id,
+      photoName: place.photoName,
+    });
+    
     setShowNearbyResults(false);
     setNearbyPlaces([]);
     setSearchQuery("");
@@ -276,28 +293,59 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
             
             {/* Nearby Results */}
             {showNearbyResults && nearbyPlaces.length > 0 && (
-              <div className="max-h-48 overflow-y-auto space-y-1 border border-border/50 rounded-xl bg-white">
-                {nearbyPlaces.map((place) => (
-                  <button
-                    key={place.id}
-                    type="button"
-                    onClick={() => handleSelectPlace(place)}
-                    className="w-full text-left p-3 hover:bg-primary/5 transition-colors border-b border-border/30 last:border-b-0"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{place.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{place.address}</p>
-                      </div>
-                      {place.rating && (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground ml-2">
-                          <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                          {place.rating}
+              <div className="max-h-64 overflow-y-auto space-y-1 border border-border/50 rounded-xl bg-white">
+                {nearbyPlaces.map((place) => {
+                  const photoUrl = getRestaurantPhotoUrl(place.photoName, 200);
+                  return (
+                    <button
+                      key={place.id}
+                      type="button"
+                      onClick={() => handleSelectPlace(place)}
+                      className="w-full text-left p-2 hover:bg-primary/5 transition-colors border-b border-border/30 last:border-b-0"
+                    >
+                      <div className="flex gap-3 items-center">
+                        {/* Photo thumbnail */}
+                        <div className="w-14 h-14 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                          {photoUrl ? (
+                            <img
+                              src={photoUrl}
+                              alt={place.name}
+                              loading="lazy"
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                // Hide broken images
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                              <UtensilsCrossed className="w-5 h-5" />
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  </button>
-                ))}
+                        
+                        {/* Place info */}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{place.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{place.address}</p>
+                          {place.primaryType && (
+                            <p className="text-xs text-primary/70 capitalize">
+                              {place.primaryType.replace(/_/g, ' ').replace(' restaurant', '')}
+                            </p>
+                          )}
+                        </div>
+                        
+                        {/* Rating */}
+                        {place.rating && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
+                            <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                            {place.rating}
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             )}
             

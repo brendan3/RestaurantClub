@@ -263,7 +263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     try {
-      const { restaurantName, cuisine, eventDate, location, notes, maxSeats, imageUrl } = req.body;
+      const { restaurantName, cuisine, eventDate, location, notes, maxSeats, imageUrl, placeId, placePhotoName } = req.body;
       
       if (!restaurantName || !eventDate) {
         return res.status(400).json({ 
@@ -298,6 +298,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "confirmed",
         pickerId: req.user!.id,
         imageUrl: imageUrl || null,
+        placeId: placeId || null,
+        placePhotoName: placePhotoName || null,
       });
       
       res.json(event);
@@ -622,6 +624,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     rating?: number;
     priceLevel?: string;
     googleMapsUrl?: string;
+    photoName?: string; // Google Places photo reference name
   }
 
   // Search nearby restaurants using Google Places API (New)
@@ -679,7 +682,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         headers: {
           "Content-Type": "application/json",
           "X-Goog-Api-Key": apiKey,
-          "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.primaryType,places.location,places.rating,places.priceLevel,places.googleMapsUri",
+          "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.primaryType,places.location,places.rating,places.priceLevel,places.googleMapsUri,places.photos",
         },
         body: JSON.stringify(requestBody),
       });
@@ -720,6 +723,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         rating: place.rating || undefined,
         priceLevel: place.priceLevel || undefined,
         googleMapsUrl: place.googleMapsUri || undefined,
+        photoName: place.photos?.[0]?.name || undefined,
       }));
       
       res.json({ places });
@@ -790,7 +794,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         headers: {
           "Content-Type": "application/json",
           "X-Goog-Api-Key": apiKey,
-          "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.primaryType,places.location,places.rating,places.priceLevel,places.googleMapsUri",
+          "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.primaryType,places.location,places.rating,places.priceLevel,places.googleMapsUri,places.photos",
         },
         body: JSON.stringify(requestBody),
       });
@@ -835,6 +839,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         rating: place.rating || undefined,
         priceLevel: place.priceLevel || undefined,
         googleMapsUrl: place.googleMapsUri || undefined,
+        photoName: place.photos?.[0]?.name || undefined,
       }));
       
       res.json({ places });
@@ -843,6 +848,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("[Places Text Search] Error searching restaurants:", error);
       }
       res.status(500).json({ error: "Failed to search restaurants" });
+    }
+  });
+
+  // ============================================
+  // RESTAURANT PHOTO PROXY ENDPOINT
+  // ============================================
+
+  // Proxy endpoint for Google Places photos (keeps API key server-side)
+  // Note: No auth required - photoName values are opaque Google references
+  // that are only obtainable from authenticated search endpoints
+  app.get("/api/restaurants/photo", async (req, res) => {
+    const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+    
+    if (!apiKey) {
+      return res.status(501).json({ error: "Places API not configured" });
+    }
+    
+    try {
+      const { name, maxWidth } = req.query;
+      
+      if (!name || typeof name !== "string") {
+        return res.status(400).json({ error: "Photo name is required" });
+      }
+      
+      // Validate the photo name format (should start with "places/")
+      if (!name.startsWith("places/")) {
+        return res.status(400).json({ error: "Invalid photo name format" });
+      }
+      
+      const maxWidthPx = parseInt(maxWidth as string) || 400;
+      // Clamp to reasonable values
+      const clampedWidth = Math.min(Math.max(maxWidthPx, 100), 1200);
+      
+      // Google Places API (New) photo endpoint
+      const photoUrl = `https://places.googleapis.com/v1/${name}/media?maxWidthPx=${clampedWidth}&key=${apiKey}`;
+      
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Places Photo] Fetching photo:", name);
+      }
+      
+      const response = await fetch(photoUrl, {
+        redirect: "follow", // Follow redirects to get the actual image
+      });
+      
+      if (!response.ok) {
+        if (process.env.NODE_ENV === "development") {
+          console.error("[Places Photo] Error:", response.status, response.statusText);
+        }
+        return res.status(502).json({ error: "Unable to load photo" });
+      }
+      
+      // Get content type from Google's response
+      const contentType = response.headers.get("content-type") || "image/jpeg";
+      
+      // Set appropriate headers
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 24 hours
+      
+      // Stream the image data
+      const arrayBuffer = await response.arrayBuffer();
+      res.send(Buffer.from(arrayBuffer));
+      
+    } catch (error) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("[Places Photo] Error fetching photo:", error);
+      }
+      res.status(500).json({ error: "Failed to fetch photo" });
     }
   });
 
