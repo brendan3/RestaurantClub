@@ -74,10 +74,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <aside className="hidden md:flex flex-col w-20 lg:w-64 p-4 shrink-0 sticky top-0 h-screen">
         <div className="bg-card/50 h-full rounded-[2rem] border border-white/50 shadow-sm p-4 flex flex-col">
             <Link href="/" className="flex items-center justify-center lg:justify-start gap-3 mb-8 p-2 cursor-pointer hover:opacity-80 transition-opacity">
-              <img src={ASSETS.mascot} alt="Mascot" className="w-10 h-10 object-contain drop-shadow-sm hover:scale-110 transition-transform duration-500" />
-              <div className="hidden lg:block">
+            <img src={ASSETS.mascot} alt="Mascot" className="w-10 h-10 object-contain drop-shadow-sm hover:scale-110 transition-transform duration-500" />
+            <div className="hidden lg:block">
                 <h1 className="font-heading font-bold text-xl text-primary leading-tight tracking-tight">Restaurant<br/><span className="text-foreground/80">Club</span></h1>
-              </div>
+            </div>
             </Link>
 
             {/* Desktop Add Event Button */}
@@ -119,17 +119,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </nav>
 
             {nextEvent && (
-              <div className="mt-auto pt-6 border-t border-border/50 hidden lg:block">
+            <div className="mt-auto pt-6 border-t border-border/50 hidden lg:block">
                 <Link href={`/event/${nextEvent.id}`}>
                   <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10 hover:bg-primary/10 transition-colors cursor-pointer">
-                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Next Up</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Next Up</p>
                     <p className="text-sm font-bold text-foreground">{nextEvent.restaurantName}</p>
                     <p className="text-xs text-primary font-medium mt-1">
                       {getDaysLabel(getDaysUntil(nextEvent.eventDate))}
                     </p>
-                  </div>
+            </div>
                 </Link>
-              </div>
+            </div>
             )}
         </div>
       </aside>

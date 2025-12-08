@@ -270,8 +270,8 @@ Sign up at the app and enter the code to join!`;
             onClick={() => setIsInviteOpen(true)}
             className="gap-2 rounded-full bg-white shadow-sm border border-white/50 text-foreground hover:bg-primary/10 hover:text-primary transition-all hover:scale-105"
           >
-            <Share2 className="w-4 h-4" /> Invite Friend
-          </Button>
+          <Share2 className="w-4 h-4" /> Invite Friend
+        </Button>
         </div>
       </div>
 
@@ -374,9 +374,9 @@ Sign up at the app and enter the code to join!`;
                 </>
               ) : (
                 <>
-                  <span className="block text-5xl font-heading font-black text-white">
-                    {calculateDaysUntil(upcomingEvent.eventDate)}
-                  </span>
+              <span className="block text-5xl font-heading font-black text-white">
+                {calculateDaysUntil(upcomingEvent.eventDate)}
+              </span>
                   <span className="block text-sm font-medium text-white/80 mb-3">
                     {calculateDaysUntil(upcomingEvent.eventDate) === 1 ? "day left" : "days left"}
                   </span>
@@ -720,7 +720,7 @@ Sign up at the app and enter the code to join!`;
                 <p className="text-xs text-muted-foreground">Add restaurants to your wishlist from events!</p>
               </div>
             ) : (
-              <ul className="space-y-2">
+            <ul className="space-y-2">
                 {wishlist.slice(0, 5).map((item) => (
                   <li key={item.id} className="flex items-center justify-between p-3 hover:bg-white rounded-2xl transition-all duration-300 group border border-transparent hover:border-border/50 hover:shadow-sm">
                     <span className="font-medium text-foreground/90 truncate flex-1">{item.name}</span>
@@ -737,9 +737,9 @@ Sign up at the app and enter the code to join!`;
                         <Trash2 className="w-3 h-3 text-red-500" />
                       </button>
                     </div>
-                  </li>
+              </li>
                 ))}
-              </ul>
+            </ul>
             )}
             {wishlist.length > 5 && (
               <Button variant="ghost" size="sm" className="w-full mt-4 text-primary hover:bg-primary/5 rounded-xl font-bold">

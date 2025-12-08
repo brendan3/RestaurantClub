@@ -80,71 +80,71 @@ export default function History() {
               ? "Try a different search term." 
               : "Your culinary adventures will appear here after they happen!"}
           </p>
-        </div>
+      </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredEvents.map((event) => (
-            <Card key={event.id} className="border-none shadow-soft group overflow-hidden flex flex-col h-full">
+          <Card key={event.id} className="border-none shadow-soft group overflow-hidden flex flex-col h-full">
               <div className="relative h-48 overflow-hidden bg-muted">
-                <img 
+              <img 
                   src={getEventImageUrl(event, 800)} 
                   alt={event.restaurantName} 
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                   onError={(e) => {
                     // Fallback to placeholder on error
                     (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80";
                   }}
-                />
+              />
                 {event.rating && (
-                  <div className="absolute top-3 right-3 bg-white/90 backdrop-blur px-2 py-1 rounded-lg flex items-center gap-1 text-xs font-bold shadow-sm text-foreground">
-                    <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                    {event.rating}
-                  </div>
+              <div className="absolute top-3 right-3 bg-white/90 backdrop-blur px-2 py-1 rounded-lg flex items-center gap-1 text-xs font-bold shadow-sm text-foreground">
+                <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                {event.rating}
+              </div>
                 )}
                 {event.cuisine && (
                   <div className="absolute bottom-3 left-3">
                     <Badge className="bg-black/50 hover:bg-black/70 text-white backdrop-blur-md border-none text-[10px]">
                       {event.cuisine}
-                    </Badge>
-                  </div>
-                )}
+                  </Badge>
               </div>
-              
-              <CardContent className="p-5 flex-1">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
+                )}
+            </div>
+            
+            <CardContent className="p-5 flex-1">
+              <div className="flex justify-between items-start mb-2">
+                <div>
                     <h3 className="font-heading font-bold text-xl text-foreground group-hover:text-primary transition-colors">{event.restaurantName}</h3>
                     {event.location && (
                       <p className="text-sm text-muted-foreground truncate max-w-[200px]">{event.location}</p>
                     )}
-                  </div>
+                </div>
                   {event.totalBill && (
-                    <div className="text-right">
+                <div className="text-right">
                       <span className="block text-sm font-bold text-foreground">${event.totalBill}</span>
-                      <span className="block text-[10px] text-muted-foreground">Total Bill</span>
-                    </div>
+                  <span className="block text-[10px] text-muted-foreground">Total Bill</span>
+                </div>
                   )}
-                </div>
-                
-                <div className="flex items-center gap-2 mt-4 text-sm text-muted-foreground">
-                  <Calendar className="w-4 h-4" />
+              </div>
+              
+              <div className="flex items-center gap-2 mt-4 text-sm text-muted-foreground">
+                <Calendar className="w-4 h-4" />
                   {new Date(event.eventDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                </div>
-              </CardContent>
+              </div>
+            </CardContent>
 
-              <CardFooter className="p-5 pt-0 border-t border-border/50 mt-auto">
-                <div className="flex items-center justify-between w-full pt-4">
-                  <div className="flex items-center gap-2">
+            <CardFooter className="p-5 pt-0 border-t border-border/50 mt-auto">
+              <div className="flex items-center justify-between w-full pt-4">
+                <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">Event</span>
                   </div>
                   <Button asChild variant="ghost" size="sm" className="text-xs h-8 text-primary hover:text-primary hover:bg-primary/10">
                     <Link href={`/event/${event.id}`}>View Details</Link>
-                  </Button>
-                </div>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
+                </Button>
+              </div>
+            </CardFooter>
+          </Card>
+        ))}
+      </div>
       )}
     </div>
   );

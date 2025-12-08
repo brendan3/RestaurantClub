@@ -51,7 +51,7 @@ export default function Login() {
         setLoginError("You must verify your email before logging in.");
       } else {
         setLoginError(error.message || "Failed to login");
-        toast.error(error.message || "Failed to login");
+      toast.error(error.message || "Failed to login");
       }
     } finally {
       setIsLoading(false);

@@ -861,7 +861,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/restaurants/photo", async (req, res) => {
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
     
+    // Log all photo requests (runs in both dev and production for debugging)
+    console.log("[Places Photo] Request received, name:", req.query.name?.toString().substring(0, 50) + "...");
+    
     if (!apiKey) {
+      console.warn("[Places Photo] API key not configured");
       return res.status(501).json({ error: "Places API not configured" });
     }
     
@@ -869,11 +873,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { name, maxWidth } = req.query;
       
       if (!name || typeof name !== "string") {
+        console.warn("[Places Photo] Missing or invalid name parameter");
         return res.status(400).json({ error: "Photo name is required" });
       }
       
       // Validate the photo name format (should start with "places/")
       if (!name.startsWith("places/")) {
+        console.warn("[Places Photo] Invalid photo name format:", name.substring(0, 30));
         return res.status(400).json({ error: "Invalid photo name format" });
       }
       
@@ -884,18 +890,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Google Places API (New) photo endpoint
       const photoUrl = `https://places.googleapis.com/v1/${name}/media?maxWidthPx=${clampedWidth}&key=${apiKey}`;
       
-      if (process.env.NODE_ENV === "development") {
-        console.log("[Places Photo] Fetching photo:", name);
-      }
-      
       const response = await fetch(photoUrl, {
         redirect: "follow", // Follow redirects to get the actual image
       });
       
+      // Log response status (runs in both dev and production)
+      console.log("[Places Photo] Google API response status:", response.status);
+      
       if (!response.ok) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("[Places Photo] Error:", response.status, response.statusText);
-        }
+        const errorBody = await response.text();
+        console.error("[Places Photo] Google API error:", response.status, response.statusText);
+        console.error("[Places Photo] Error body:", errorBody.substring(0, 500));
         return res.status(502).json({ error: "Unable to load photo" });
       }
       
@@ -908,12 +913,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Stream the image data
       const arrayBuffer = await response.arrayBuffer();
+      console.log("[Places Photo] Success, serving", arrayBuffer.byteLength, "bytes as", contentType);
       res.send(Buffer.from(arrayBuffer));
       
     } catch (error) {
-      if (process.env.NODE_ENV === "development") {
-        console.error("[Places Photo] Error fetching photo:", error);
-      }
+      console.error("[Places Photo] Exception fetching photo:", error);
       res.status(500).json({ error: "Failed to fetch photo" });
     }
   });

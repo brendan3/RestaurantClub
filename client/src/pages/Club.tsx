@@ -196,7 +196,7 @@ Sign up at the app and enter the code to join!`;
             <p className="text-xs text-muted-foreground">Add restaurants to your wishlist from event pages!</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {wishlist.slice(0, 6).map((spot) => (
               <div key={spot.id} className="bg-card p-4 rounded-xl border shadow-sm flex justify-between items-center">
                 <div className="flex-1 min-w-0">
@@ -239,7 +239,7 @@ Sign up at the app and enter the code to join!`;
                 <p className="text-3xl font-heading font-black text-primary tracking-widest">
                   {club.joinCode}
                 </p>
-              </div>
+                </div>
             ) : (
               <div className="bg-muted/50 rounded-2xl p-4 text-center">
                 <p className="text-sm text-muted-foreground">Loading invite code...</p>
@@ -279,8 +279,8 @@ Sign up at the app and enter the code to join!`;
                 <Button variant="outline" size="icon" className="rounded-full w-10 h-10 opacity-50 cursor-not-allowed" disabled>
                   <MessageCircle className="w-4 h-4" />
                 </Button>
-              </div>
-            </div>
+        </div>
+      </div>
           </div>
         </DialogContent>
       </Dialog>

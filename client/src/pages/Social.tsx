@@ -243,8 +243,8 @@ export default function Social() {
                          {item.cuisine}
                        </Badge>
                      )}
-                   </CardContent>
-                 </Card>
+               </CardContent>
+             </Card>
                </Link>
              ))
            )}

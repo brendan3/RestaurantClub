@@ -9,7 +9,7 @@
  *   const events = await getEvents();
  */
 
-import { apiRequest, setAuthToken, getAuthToken } from "@/config";
+import { apiRequest, setAuthToken, getAuthToken, API_BASE_URL } from "@/config";
 
 // Types (will be moved to shared schema later)
 export interface Event {
@@ -408,20 +408,22 @@ export interface NearbyPlace {
 /**
  * Get the URL for a restaurant photo (proxied through our backend)
  * Returns undefined if no photoName is available
+ * Uses the full API base URL to ensure production requests go to Railway, not Vercel
  */
 export function getRestaurantPhotoUrl(photoName?: string, maxWidth: number = 400): string | undefined {
   if (!photoName) return undefined;
-  return `/api/restaurants/photo?name=${encodeURIComponent(photoName)}&maxWidth=${maxWidth}`;
+  return `${API_BASE_URL}/api/restaurants/photo?name=${encodeURIComponent(photoName)}&maxWidth=${maxWidth}`;
 }
 
 /**
  * Get the image URL for an event, using Google Places photo if available,
  * otherwise falling back to the event's imageUrl or a default placeholder
+ * Uses the full API base URL to ensure production requests go to Railway, not Vercel
  */
 export function getEventImageUrl(event: Event, maxWidth: number = 1200): string {
   // Priority 1: Google Places photo
   if (event.placePhotoName) {
-    return `/api/restaurants/photo?name=${encodeURIComponent(event.placePhotoName)}&maxWidth=${maxWidth}`;
+    return `${API_BASE_URL}/api/restaurants/photo?name=${encodeURIComponent(event.placePhotoName)}&maxWidth=${maxWidth}`;
   }
   // Priority 2: Custom image URL on the event
   if (event.imageUrl) {

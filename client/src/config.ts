@@ -41,14 +41,14 @@ export async function apiRequest<T>(endpoint: string, options?: RequestInit): Pr
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...options?.headers,
-      },
-      credentials: "include",
-      ...options,
-    });
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options?.headers,
+    },
+    credentials: "include",
+    ...options,
+  });
   } catch (error) {
     // Network error - throw a user-friendly message
     throw new Error("Network error. Please check your connection and try again.");

@@ -117,10 +117,10 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <EventModalProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-          </TooltipProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+        </TooltipProvider>
         </EventModalProvider>
       </AuthProvider>
     </QueryClientProvider>
