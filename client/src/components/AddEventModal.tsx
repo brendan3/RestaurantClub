@@ -15,6 +15,62 @@ import { Textarea } from "@/components/ui/textarea";
 import { createEvent, searchNearbyRestaurants, searchRestaurants, getRestaurantPhotoUrl, type NearbyPlace } from "@/lib/api";
 import { toast } from "sonner";
 
+/**
+ * Geolocation helper that always settles (resolves or rejects) within timeoutMs.
+ * This avoids hanging forever in environments where WKWebView never calls the
+ * success or error callbacks.
+ */
+const getCurrentPositionSafe = (timeoutMs = 10000): Promise<GeolocationPosition> => {
+  return new Promise((resolve, reject) => {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+      const err: any = new Error("Geolocation not supported");
+      err.code = 0;
+      console.warn("RC: geolocation NOT available in navigator");
+      reject(err);
+      return;
+    }
+
+    let settled = false;
+
+    const finish = (fn: (value: any) => void, value: any) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn(value);
+    };
+
+    const timer = setTimeout(() => {
+      if (settled) return;
+      const err: any = new Error("Geolocation timeout");
+      // Align with standard TIMEOUT code (3)
+      err.code = 3;
+      console.warn("RC: geolocation manual timeout fired");
+      finish(reject, err);
+    }, timeoutMs);
+
+    console.log("RC: calling navigator.geolocation.getCurrentPosition");
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        console.log("RC: geolocation SUCCESS", {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        });
+        finish(resolve, pos);
+      },
+      (error) => {
+        console.error("RC: geolocation ERROR", error);
+        finish(reject, error);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: timeoutMs,
+        maximumAge: 60000,
+      }
+    );
+  });
+};
+
 interface AddEventModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -126,11 +182,13 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
   };
 
   const handleSearchNearby = async () => {
+    console.log("RC: handleSearchNearby START");
     setIsSearchingNearby(true);
     setNearbyPlaces([]);
     
     const query = buildRestaurantQuery();
-    
+    console.log("RC: built restaurant query", { query });
+
     try {
       let places: NearbyPlace[];
       let latitude: number | undefined;
@@ -138,21 +196,20 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
       
       // Try to get user's location (optional for text search)
       try {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 60000,
-          });
-        });
+        const position = await getCurrentPositionSafe(8000);
         latitude = position.coords.latitude;
         longitude = position.coords.longitude;
       } catch (geoError: any) {
+        console.warn("RC: geolocation failed, falling back", geoError);
+
         // If we have a query, we can still do text search without location
         if (query) {
-          // Location failed but we have a query - proceed without location bias
           if (geoError.code === 1) {
             toast.info("Location access denied. Searching without location bias.");
+          } else if (geoError.code === 2) {
+            toast.info("Couldn't determine your location. Searching without location bias.");
+          } else if (geoError.code === 3) {
+            toast.info("Location request timed out. Searching without location bias.");
           }
           // Continue without lat/lng
         } else {
@@ -163,27 +220,33 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
             toast.error("Couldn't determine your location. Please try again or enter a search term.");
           } else if (geoError.code === 3) {
             toast.error("Location request timed out. Please try again or enter a search term.");
+          } else {
+            toast.error("Couldn't access your location. Please try again or enter a search term.");
           }
           setIsSearchingNearby(false);
+          console.log("RC: handleSearchNearby EARLY RETURN (no query + no location)");
           return;
         }
       }
       
       // Decide which API to use based on whether we have a query
       if (query) {
-        // Use text search with optional location bias
+        console.log("RC: calling searchRestaurants", { query, latitude, longitude });
         places = await searchRestaurants(query, latitude, longitude);
       } else {
         // Use nearby search (requires location)
         if (latitude === undefined || longitude === undefined) {
           toast.error("Location is required for nearby search. Please enter a search term or allow location access.");
           setIsSearchingNearby(false);
+          console.log("RC: handleSearchNearby EARLY RETURN (nearby without location)");
           return;
         }
+        console.log("RC: calling searchNearbyRestaurants", { latitude, longitude });
         const result = await searchNearbyRestaurants(latitude, longitude);
         places = result.places;
       }
       
+      console.log("RC: places result", { count: places.length });
       setNearbyPlaces(places);
       setShowNearbyResults(true);
       
@@ -191,6 +254,7 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
         toast.info("No restaurants found. Try a different search term.");
       }
     } catch (error: any) {
+      console.error("RC: handleSearchNearby ERROR", error);
       if (error.message?.includes("not configured")) {
         toast.info("Restaurant search not configured yet. You can still type a name manually.");
       } else {
@@ -199,6 +263,7 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
       }
     } finally {
       setIsSearchingNearby(false);
+      console.log("RC: handleSearchNearby FINISH");
     }
   };
 
@@ -487,4 +552,3 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
     </Dialog>
   );
 }
-
