@@ -1,8 +1,8 @@
-import { eq, desc, asc, and, gte, lt } from "drizzle-orm";
+import { eq, desc, asc, and, gte, lt, sql } from "drizzle-orm";
 import { db } from "./db"; // <-- FIX 1: Import 'db' directly (not getDb)
 import { 
-  users, events, clubs, clubMembers, eventAttendees, eventTags, wishlistRestaurants,
-  type User, type InsertUser, type Event, type Club, type WishlistRestaurant 
+  users, events, clubs, clubMembers, eventAttendees, eventTags, wishlistRestaurants, eventPhotos,
+  type User, type InsertUser, type Event, type Club, type WishlistRestaurant, type EventPhoto
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -381,5 +381,42 @@ export class DatabaseStorage implements IStorage {
         eq(wishlistRestaurants.id, id),
         eq(wishlistRestaurants.userId, userId)
       ));
+  }
+
+  // Event photo methods
+  async getEventPhotos(eventId: string): Promise<EventPhoto[]> {
+    return await db
+      .select()
+      .from(eventPhotos)
+      .where(eq(eventPhotos.eventId, eventId))
+      .orderBy(
+        sql`coalesce(${eventPhotos.order}, 2147483647)`,
+        asc(eventPhotos.createdAt),
+        asc(eventPhotos.id),
+      );
+  }
+
+  async addEventPhoto(input: {
+    eventId: string;
+    userId: string;
+    imageUrl: string;
+    caption?: string | null;
+    order?: number | null;
+  }): Promise<EventPhoto> {
+    const result = await db
+      .insert(eventPhotos)
+      .values({
+        eventId: input.eventId,
+        userId: input.userId,
+        imageUrl: input.imageUrl,
+        caption: input.caption ?? null,
+        order: input.order ?? null,
+      })
+      .returning();
+    return result[0];
+  }
+
+  async deleteEventPhoto(photoId: string): Promise<void> {
+    await db.delete(eventPhotos).where(eq(eventPhotos.id, photoId));
   }
 }

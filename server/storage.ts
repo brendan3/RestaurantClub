@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Event, type Club, type WishlistRestaurant } from "@shared/schema";
+import { type User, type InsertUser, type Event, type Club, type WishlistRestaurant, type EventPhoto } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 // Storage interface for all CRUD operations
@@ -71,6 +71,17 @@ export interface IStorage {
     imageUrl?: string | null;
   }): Promise<WishlistRestaurant>;
   removeWishlistRestaurant(id: string, userId: string): Promise<void>;
+
+  // Event photo methods
+  getEventPhotos(eventId: string): Promise<EventPhoto[]>;
+  addEventPhoto(input: {
+    eventId: string;
+    userId: string;
+    imageUrl: string;
+    caption?: string | null;
+    order?: number | null;
+  }): Promise<EventPhoto>;
+  deleteEventPhoto(photoId: string, userId: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -266,6 +277,19 @@ export class MemStorage implements IStorage {
 
   async removeWishlistRestaurant(): Promise<void> {
     throw new Error("Not implemented");
+  }
+
+  // Event photo methods
+  async getEventPhotos(): Promise<EventPhoto[]> {
+    return [];
+  }
+
+  async addEventPhoto(): Promise<EventPhoto> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async deleteEventPhoto(): Promise<void> {
+    throw new Error("Not implemented in MemStorage");
   }
 }
 

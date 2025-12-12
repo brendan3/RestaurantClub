@@ -2,23 +2,17 @@ import { useState, useEffect, useRef } from "react";
 import { useRoute, Link } from "wouter";
 import { 
   Calendar, Clock, MapPin, Users, ArrowLeft, Edit2, Save, X, 
-  Camera, Image as ImageIcon, Trash2, Check
+  Camera, Check
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { getEventById, updateEvent, getEventRsvps, getUserRsvp, rsvpToEvent, addToWishlist, getEventImageUrl } from "@/lib/api";
+import { getEventById, updateEvent, getEventRsvps, getUserRsvp, rsvpToEvent, addToWishlist, getEventImageUrl, getEventPhotos, uploadEventPhoto, type EventPhoto } from "@/lib/api";
 import { Heart } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
-
-interface PhotoPreview {
-  id: string;
-  file: File;
-  preview: string;
-}
 
 export default function EventDetail() {
   const [, params] = useRoute("/event/:id");
@@ -36,8 +30,10 @@ export default function EventDetail() {
   const [notesValue, setNotesValue] = useState("");
   const [isSavingNotes, setIsSavingNotes] = useState(false);
 
-  // Photo upload state (client-side only for now)
-  const [photos, setPhotos] = useState<PhotoPreview[]>([]);
+  // Event recap photo gallery
+  const [photos, setPhotos] = useState<EventPhoto[]>([]);
+  const [isPhotosLoading, setIsPhotosLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isAddingToWishlist, setIsAddingToWishlist] = useState(false);
   const [addedToWishlist, setAddedToWishlist] = useState(false);
@@ -64,6 +60,28 @@ export default function EventDetail() {
       loadEventData();
     }
   }, [eventId]);
+
+  useEffect(() => {
+    if (!event?.id) return;
+    let cancelled = false;
+
+    const loadPhotos = async () => {
+      try {
+        setIsPhotosLoading(true);
+        const res = await getEventPhotos(event.id);
+        if (!cancelled) setPhotos(res);
+      } catch (err) {
+        console.error("Failed to load photos", err);
+      } finally {
+        if (!cancelled) setIsPhotosLoading(false);
+      }
+    };
+
+    loadPhotos();
+    return () => {
+      cancelled = true;
+    };
+  }, [event?.id]);
 
   const loadEventData = async () => {
     if (!eventId) return;
@@ -176,44 +194,40 @@ export default function EventDetail() {
     setIsEditingNotes(false);
   };
 
-  // Photo handling (client-side preview only)
-  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
+  const isPastEvent = !!event && new Date(event.eventDate) < new Date();
 
-    const newPhotos: PhotoPreview[] = [];
-    
-    Array.from(files).forEach(file => {
-      if (file.type.startsWith("image/")) {
-        const preview = URL.createObjectURL(file);
-        newPhotos.push({
-          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          file,
-          preview,
-        });
-      }
-    });
-
-    setPhotos(prev => [...prev, ...newPhotos]);
-    
-    // Reset input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-
-    if (newPhotos.length > 0) {
-      toast.success(`${newPhotos.length} photo(s) added (preview only)`);
-    }
+  const handlePhotoClick = () => {
+    if (!isPastEvent) return;
+    fileInputRef.current?.click();
   };
 
-  const handleRemovePhoto = (photoId: string) => {
-    setPhotos(prev => {
-      const photo = prev.find(p => p.id === photoId);
-      if (photo) {
-        URL.revokeObjectURL(photo.preview);
+  const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || !event) return;
+
+    const fileArray = Array.from(files).filter(f => f.type.startsWith("image/")).slice(0, 4);
+    if (fileArray.length === 0) return;
+
+    setIsUploading(true);
+    try {
+      const uploaded: EventPhoto[] = [];
+      for (const file of fileArray) {
+        const photo = await uploadEventPhoto(event.id, file);
+        uploaded.push(photo);
       }
-      return prev.filter(p => p.id !== photoId);
-    });
+      // newest first in UI
+      setPhotos(prev => [...uploaded, ...prev]);
+      toast.success(`Uploaded ${uploaded.length} photo${uploaded.length !== 1 ? "s" : ""}`);
+    } catch (err: any) {
+      console.error("Upload failed", err);
+      const msg = err?.message?.includes("not configured")
+        ? "Photo uploads not available right now."
+        : "Failed to upload photos. Please try again.";
+      toast.error(msg);
+    } finally {
+      setIsUploading(false);
+      e.target.value = "";
+    }
   };
 
   const handleAddToWishlist = async () => {
@@ -235,12 +249,7 @@ export default function EventDetail() {
     }
   };
 
-  // Cleanup previews on unmount
-  useEffect(() => {
-    return () => {
-      photos.forEach(photo => URL.revokeObjectURL(photo.preview));
-    };
-  }, []);
+  // no preview cleanup needed (Cloudinary URLs)
 
   if (isLoading) {
     return (
@@ -595,66 +604,71 @@ export default function EventDetail() {
                 <Camera className="w-5 h-5 text-primary" />
                 Photos
               </CardTitle>
+              {isPastEvent ? (
+                <p className="text-xs text-muted-foreground">Add recap photos after your dinner.</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">Recap photos unlock after this dinner happens.</p>
+              )}
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Photo Grid */}
-              {photos.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {photos.map(photo => (
-                    <div 
-                      key={photo.id} 
-                      className="relative group aspect-square rounded-xl overflow-hidden bg-muted"
-                    >
-                      <img 
-                        src={photo.preview} 
-                        alt="Event photo" 
-                        className="w-full h-full object-cover"
-                      />
-                      <button
-                        onClick={() => handleRemovePhoto(photo.id)}
-                        className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+              {/* Scrollable gallery */}
+              {isPhotosLoading ? (
+                <p className="text-sm text-muted-foreground">Loading photos…</p>
+              ) : photos.length > 0 ? (
+                <div className="overflow-x-auto pb-2">
+                  <div className="flex gap-3">
+                    {photos.map((photo) => (
+                      <div
+                        key={photo.id}
+                        className="relative flex-shrink-0 w-32 h-32 rounded-xl overflow-hidden border border-muted/40 bg-muted"
                       >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                      {/* Preview indicator */}
-                      <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/50 text-white text-xs rounded-full">
-                        Preview
+                        <img
+                          src={photo.imageUrl}
+                          alt="Event photo"
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No recap photos yet.
+                </p>
               )}
 
-              {/* Upload Button */}
-              <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-muted-foreground/20 rounded-xl hover:border-primary/50 hover:bg-primary/5 transition-colors cursor-pointer"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <ImageIcon className="w-10 h-10 text-muted-foreground mb-3" />
-                <p className="font-medium text-foreground mb-1">Upload Photos</p>
-                <p className="text-sm text-muted-foreground text-center">
-                  Click to select images from your device
+              {/* Upload area */}
+              {isPastEvent ? (
+                <button
+                  type="button"
+                  onClick={handlePhotoClick}
+                  disabled={isUploading}
+                  className="w-full border-2 border-dashed border-muted-foreground/20 rounded-2xl py-8 flex flex-col items-center justify-center gap-2 hover:border-primary/50 hover:bg-primary/5 transition-colors disabled:opacity-60"
+                >
+                  <span className="text-2xl">📷</span>
+                  <span className="text-sm font-medium">
+                    {isUploading ? "Uploading..." : "Upload Photos"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Up to 3–4 images per dinner
+                  </span>
+                </button>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Come back after{" "}
+                  {new Date(event.eventDate).toLocaleDateString()} to add your recap.
                 </p>
-                <p className="text-xs text-muted-foreground/60 mt-2">
-                  (Preview only — real storage coming soon)
-                </p>
-              </div>
-              
+              )}
+
               <input
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
                 multiple
-                onChange={handlePhotoSelect}
+                onChange={handleFilesSelected}
                 className="hidden"
               />
-
-              {/* TODO: Integrate real photo storage (S3, Supabase, etc.)
-                  When implementing:
-                  1. Upload files to storage on selection
-                  2. Store URLs in event.photos array in DB
-                  3. Load existing photos from event data
-                  4. Handle delete by removing from storage + DB
-              */}
             </CardContent>
           </Card>
         </div>

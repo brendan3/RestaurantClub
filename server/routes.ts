@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { mockEvents, mockUser, mockClubs } from "./mockData";
 import * as auth from "./auth";
 import { generateJoinCode } from "@shared/schema";
+import { isCloudinaryConfigured, uploadEventImage } from "./cloudinary";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const useMockData = !process.env.DATABASE_URL;
@@ -472,6 +473,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching event:", error);
       res.status(500).json({ error: "Failed to fetch event" });
+    }
+  });
+
+  // ============================================
+  // EVENT PHOTO ENDPOINTS
+  // ============================================
+
+  // Get photos for an event
+  app.get("/api/events/:id/photos", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.json([]);
+    }
+
+    try {
+      const eventId = req.params.id;
+      const event = await storage.getEventById(eventId);
+      if (!event) return res.status(404).json({ error: "Event not found" });
+
+      // Ensure user is in event club
+      const clubs = await storage.getUserClubs(req.user!.id);
+      const isInClub = clubs.some(c => c.id === event.clubId);
+      if (!isInClub) return res.status(403).json({ error: "You must be a member of the club to view photos" });
+
+      const photos = await storage.getEventPhotos(eventId);
+      res.json(photos);
+    } catch (error) {
+      console.error("Error fetching event photos:", error);
+      res.status(500).json({ error: "Failed to fetch photos" });
+    }
+  });
+
+  // Upload a photo for an event (Cloudinary)
+  app.post("/api/events/:id/photos", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.status(501).json({ error: "Photo uploads not available in mock mode" });
+    }
+
+    try {
+      const eventId = req.params.id;
+      const { imageData, fileName, caption } = req.body as {
+        imageData?: string;
+        fileName?: string;
+        caption?: string;
+      };
+
+      if (!imageData || typeof imageData !== "string" || !imageData.startsWith("data:image/")) {
+        return res.status(400).json({ error: "imageData must be a valid data URL" });
+      }
+
+      const event = await storage.getEventById(eventId);
+      if (!event) return res.status(404).json({ error: "Event not found" });
+
+      // Ensure user is in event club
+      const clubs = await storage.getUserClubs(req.user!.id);
+      const isInClub = clubs.some(c => c.id === event.clubId);
+      if (!isInClub) return res.status(403).json({ error: "You must be a member of the club to upload photos" });
+
+      if (!isCloudinaryConfigured()) {
+        return res.status(501).json({ error: "Photo uploads not configured yet" });
+      }
+
+      const imageUrl = await uploadEventImage(event.id, imageData);
+
+      const created = await storage.addEventPhoto({
+        eventId: event.id,
+        userId: req.user!.id,
+        imageUrl,
+        caption: caption || null,
+      });
+
+      // If event has no imageUrl yet, use the first recap photo as thumbnail
+      if (!event.imageUrl) {
+        await storage.updateEvent(event.id, { imageUrl });
+      }
+
+      res.json(created);
+    } catch (error) {
+      console.error("Error uploading event photo:", error);
+      res.status(500).json({ error: "Failed to upload photo" });
+    }
+  });
+
+  // Delete an event photo (uploader, picker, or club owner)
+  app.delete("/api/events/:id/photos/:photoId", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.status(501).json({ error: "Photo deletes not available in mock mode" });
+    }
+
+    try {
+      const eventId = req.params.id;
+      const photoId = req.params.photoId;
+
+      const event = await storage.getEventById(eventId);
+      if (!event) return res.status(404).json({ error: "Event not found" });
+
+      // Ensure user is in event club
+      const clubs = await storage.getUserClubs(req.user!.id);
+      const isInClub = clubs.some(c => c.id === event.clubId);
+      if (!isInClub) return res.status(403).json({ error: "You must be a member of the club to delete photos" });
+
+      const members = await storage.getClubMembers(event.clubId);
+      const isOwner = members.some(m => m.id === req.user!.id && m.role === "owner");
+      const isPicker = req.user!.id === event.pickerId;
+
+      const photos = await storage.getEventPhotos(eventId);
+      const photo = photos.find(p => p.id === photoId);
+      if (!photo) return res.status(404).json({ error: "Photo not found" });
+
+      const isUploader = photo.userId === req.user!.id;
+      if (!isUploader && !isOwner && !isPicker) {
+        return res.status(403).json({ error: "Not authorized to delete this photo" });
+      }
+
+      await storage.deleteEventPhoto(photoId, req.user!.id);
+      // TODO: delete from Cloudinary as well (MVP keeps CDN copy)
+      res.json({ message: "Deleted" });
+    } catch (error) {
+      console.error("Error deleting event photo:", error);
+      res.status(500).json({ error: "Failed to delete photo" });
     }
   });
 

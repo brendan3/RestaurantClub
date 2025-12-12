@@ -83,6 +83,17 @@ export const eventTags = pgTable("event_tags", {
   tag: text("tag").notNull(), // 'Fresh', 'Expensive', 'Quiet', etc.
 });
 
+// Event photos (recap gallery)
+export const eventPhotos = pgTable("event_photos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  imageUrl: text("image_url").notNull(), // Cloudinary secure_url
+  caption: text("caption"),
+  order: integer("order"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Wishlist restaurants (user-scoped)
 export const wishlistRestaurants = pgTable("wishlist_restaurants", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -135,6 +146,9 @@ export type Club = typeof clubs.$inferSelect;
 
 export type InsertEvent = z.infer<typeof insertEventSchema>;
 export type Event = typeof events.$inferSelect;
+
+export type EventPhoto = typeof eventPhotos.$inferSelect;
+export type InsertEventPhoto = typeof eventPhotos.$inferInsert;
 
 export type WishlistRestaurant = typeof wishlistRestaurants.$inferSelect;
 

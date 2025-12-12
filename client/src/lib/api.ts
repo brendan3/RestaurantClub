@@ -44,6 +44,16 @@ export interface Event {
   image?: string;
 }
 
+export interface EventPhoto {
+  id: string;
+  eventId: string;
+  userId: string;
+  imageUrl: string;
+  caption?: string | null;
+  order?: number | null;
+  createdAt?: string;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -447,16 +457,51 @@ export function getRestaurantPhotoUrl(photoName?: string, maxWidth: number = 400
  * Uses the full API base URL to ensure production requests go to Railway, not Vercel
  */
 export function getEventImageUrl(event: Event, maxWidth: number = 1200): string {
-  // Priority 1: Google Places photo
-  if (event.placePhotoName) {
-    return `${API_BASE_URL}/api/restaurants/photo?name=${encodeURIComponent(event.placePhotoName)}&maxWidth=${maxWidth}`;
-  }
-  // Priority 2: Custom image URL on the event
+  // Priority 1: Custom image URL on the event (e.g. recap photo or manual cover)
   if (event.imageUrl) {
     return event.imageUrl;
   }
+  // Priority 2: Google Places photo (fallback)
+  if (event.placePhotoName) {
+    return `${API_BASE_URL}/api/restaurants/photo?name=${encodeURIComponent(event.placePhotoName)}&maxWidth=${maxWidth}`;
+  }
   // Priority 3: Default placeholder
   return "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1000&q=80";
+}
+
+// ============================================
+// EVENT PHOTO FUNCTIONS
+// ============================================
+
+export async function getEventPhotos(eventId: string): Promise<EventPhoto[]> {
+  return apiRequest<EventPhoto[]>(`/api/events/${eventId}/photos`);
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+export async function uploadEventPhoto(eventId: string, file: File, caption?: string): Promise<EventPhoto> {
+  const imageData = await fileToDataUrl(file);
+  return apiRequest<EventPhoto>(`/api/events/${eventId}/photos`, {
+    method: "POST",
+    body: JSON.stringify({
+      imageData,
+      fileName: file.name,
+      caption,
+    }),
+  });
+}
+
+export async function deleteEventPhoto(eventId: string, photoId: string): Promise<void> {
+  await apiRequest<{ message: string }>(`/api/events/${eventId}/photos/${photoId}`, {
+    method: "DELETE",
+  });
 }
 
 export interface NearbyRestaurantsResponse {
