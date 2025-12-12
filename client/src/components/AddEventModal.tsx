@@ -87,6 +87,7 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
     location: "",
     notes: "",
     maxSeats: "",
+    imageUrl: "",
   });
 
   // Nearby restaurant search state
@@ -124,6 +125,7 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
         maxSeats: formData.maxSeats ? parseInt(formData.maxSeats, 10) : undefined,
         placeId: selectedPlace?.placeId || null,
         placePhotoName: selectedPlace?.photoName || null,
+        imageUrl: formData.imageUrl.trim() || undefined,
       });
 
       toast.success("Event created! 🎉");
@@ -137,6 +139,7 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
         location: "",
         notes: "",
         maxSeats: "",
+        imageUrl: "",
       });
       setSelectedPlace(null);
       
@@ -492,6 +495,20 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
               placeholder="e.g., 123 Main St, New York"
               value={formData.location}
               onChange={handleChange("location")}
+              className="rounded-xl h-11"
+            />
+          </div>
+
+          {/* Cover Image URL */}
+          <div className="space-y-2">
+            <Label htmlFor="imageUrl" className="text-sm font-medium">
+              Cover Image URL (optional)
+            </Label>
+            <Input
+              id="imageUrl"
+              placeholder="https://example.com/photo.jpg"
+              value={formData.imageUrl}
+              onChange={handleChange("imageUrl")}
               className="rounded-xl h-11"
             />
           </div>

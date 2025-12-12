@@ -272,13 +272,39 @@ export async function createEvent(eventData: {
  * Update an existing event
  */
 export async function updateEvent(eventId: string, eventData: {
-  notes?: string;
+  restaurantName?: string;
+  cuisine?: string;
+  eventDate?: string;
   location?: string;
+  notes?: string;
   maxSeats?: number;
+  imageUrl?: string;
+  placeId?: string | null;
+  placePhotoName?: string | null;
+  rating?: number | null;
+  totalBill?: number | null;
+  status?: "pending" | "confirmed" | "past";
 }): Promise<Event> {
   return apiRequest<Event>(`/api/events/${eventId}`, {
     method: "PATCH",
     body: JSON.stringify(eventData),
+  });
+}
+
+export async function updateClub(
+  clubId: string,
+  data: { name?: string; type?: "private" | "public" }
+): Promise<Club> {
+  return apiRequest<Club>(`/api/clubs/${clubId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateUserProfile(data: { name?: string; avatar?: string | null }): Promise<User> {
+  return apiRequest<User>("/api/user/me", {
+    method: "PATCH",
+    body: JSON.stringify(data),
   });
 }
 

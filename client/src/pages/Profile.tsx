@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Settings, Award, Star, LogOut, Users, User, Bell, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { logout, getUserClubs, getWishlist, removeFromWishlist, type Club, type WishlistRestaurant } from "@/lib/api";
+import { logout, getUserClubs, getWishlist, removeFromWishlist, updateUserProfile, type Club, type WishlistRestaurant } from "@/lib/api";
 import { toast } from "sonner";
 import { Trash2, Heart } from "lucide-react";
 
@@ -21,8 +21,14 @@ export default function Profile() {
   const { user, setUser } = useAuth();
   const [, setLocation] = useLocation();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [userClubs, setUserClubs] = useState<Club[]>([]);
   const [wishlist, setWishlist] = useState<WishlistRestaurant[]>([]);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    name: user?.name ?? "",
+    avatar: user?.avatar ?? "",
+  });
 
   useEffect(() => {
     const loadData = async () => {
@@ -58,6 +64,23 @@ export default function Profile() {
       setLocation("/login");
     } catch (error: any) {
       toast.error(error.message || "Failed to logout");
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    setIsSavingProfile(true);
+    try {
+      const updated = await updateUserProfile({
+        name: profileForm.name,
+        avatar: profileForm.avatar || null,
+      });
+      setUser(updated);
+      toast.success("Profile updated!");
+      setIsEditProfileOpen(false);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update profile");
+    } finally {
+      setIsSavingProfile(false);
     }
   };
 
@@ -201,17 +224,26 @@ export default function Profile() {
 
           <div className="p-6 pt-4 space-y-4 overflow-y-auto flex-1">
             {/* Edit Profile */}
-            <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl hover:bg-muted/50 transition-colors cursor-not-allowed">
+            <div
+              className="flex items-center justify-between p-4 bg-muted/30 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer"
+              onClick={() => {
+                setProfileForm({
+                  name: user?.name ?? "",
+                  avatar: user?.avatar ?? "",
+                });
+                setIsEditProfileOpen(true);
+              }}
+            >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
                   <User className="w-5 h-5 text-primary" />
                 </div>
                 <div>
                   <p className="font-medium">Edit Profile</p>
-                  <p className="text-xs text-muted-foreground">Update your name, photo, and info</p>
+                  <p className="text-xs text-muted-foreground">Update your name and photo</p>
                 </div>
               </div>
-              <Badge variant="secondary" className="text-xs">Coming soon</Badge>
+              <Badge variant="secondary" className="text-xs">Edit</Badge>
             </div>
 
             {/* Notification Preferences */}
@@ -260,6 +292,58 @@ export default function Profile() {
                 </div>
               )}
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Profile Modal */}
+      <Dialog open={isEditProfileOpen} onOpenChange={setIsEditProfileOpen}>
+        <DialogContent className="sm:max-w-[450px] rounded-[1.25rem]">
+          <DialogHeader>
+            <DialogTitle>Edit Profile</DialogTitle>
+            <DialogDescription>Update your name and avatar image.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <Avatar className="w-16 h-16">
+                <AvatarImage src={profileForm.avatar || undefined} />
+                <AvatarFallback>{profileForm.name?.[0] ?? "?"}</AvatarFallback>
+              </Avatar>
+              <div className="text-sm text-muted-foreground">
+                Preview of your avatar
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Name</label>
+              <input
+                type="text"
+                value={profileForm.name}
+                onChange={(e) => setProfileForm(prev => ({ ...prev, name: e.target.value }))}
+                className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="Your name"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Avatar URL</label>
+              <input
+                type="url"
+                value={profileForm.avatar}
+                onChange={(e) => setProfileForm(prev => ({ ...prev, avatar: e.target.value }))}
+                className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="https://example.com/photo.jpg"
+              />
+              <p className="text-xs text-muted-foreground">
+                Paste a photo URL (Twitter, Instagram, or any image host). Uploads coming later.
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="ghost" onClick={() => setIsEditProfileOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveProfile} disabled={isSavingProfile}>
+              {isSavingProfile ? "Saving..." : "Save"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

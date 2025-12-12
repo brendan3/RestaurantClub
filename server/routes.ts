@@ -30,6 +30,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get current user (protected)
   app.get("/api/user/me", auth.requireAuth, auth.getCurrentUser);
 
+  // Update current user profile (name, avatar)
+  app.patch("/api/user/me", auth.requireAuth, async (req, res) => {
+    try {
+      const { name, avatar } = req.body as { name?: string; avatar?: string | null };
+      
+      if (name !== undefined && (!name || typeof name !== "string")) {
+        return res.status(400).json({ error: "Name must be a non-empty string" });
+      }
+      if (avatar !== undefined && avatar !== null && typeof avatar !== "string") {
+        return res.status(400).json({ error: "Avatar must be a URL string or null" });
+      }
+      
+      const updated = await storage.updateUserProfile(req.user!.id, {
+        name,
+        avatar: avatar ?? null,
+      });
+      
+      res.json(updated);
+    } catch (err) {
+      console.error("Error updating profile:", err);
+      res.status(500).json({ error: "Failed to update profile" });
+    }
+  });
+
   // ============================================
   // CLUB ENDPOINTS
   // ============================================
@@ -191,6 +215,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update a club (owner only)
+  app.patch("/api/clubs/:id", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.status(400).json({ error: "Mock mode - club not updated" });
+    }
+    
+    try {
+      const clubId = req.params.id;
+      const { name, type } = req.body as { name?: string; type?: string };
+      
+      if (name !== undefined && (!name || typeof name !== "string")) {
+        return res.status(400).json({ error: "Club name must be a non-empty string" });
+      }
+      
+      const club = await storage.getClubById(clubId);
+      if (!club) {
+        return res.status(404).json({ error: "Club not found" });
+      }
+      
+      const members = await storage.getClubMembers(clubId);
+      const isOwner = members.some(m => m.id === req.user!.id && m.role === "owner");
+      if (!isOwner) {
+        return res.status(403).json({ error: "Only owners can update the club" });
+      }
+      
+      const updated = await storage.updateClub(clubId, { name, type });
+      const updatedMembers = await storage.getClubMembers(clubId);
+      
+      res.json({
+        ...updated,
+        members: updatedMembers.length,
+        membersList: updatedMembers.map(m => ({
+          id: m.id,
+          name: m.name,
+          avatar: m.avatar,
+          role: m.role,
+        })),
+      });
+    } catch (error) {
+      console.error("Error updating club:", error);
+      res.status(500).json({ error: "Failed to update club" });
+    }
+  });
+
   // ============================================
   // EVENT ENDPOINTS
   // ============================================
@@ -309,7 +377,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Update an event (notes, location, etc.)
+  // Update an event (owners/pickers only)
   app.patch("/api/events/:id", auth.requireAuth, async (req, res) => {
     if (useMockData) {
       return res.json({ message: "Mock mode - event not updated" });
@@ -317,7 +385,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     try {
       const eventId = req.params.id;
-      const { notes, location, maxSeats } = req.body;
+      const {
+        restaurantName,
+        cuisine,
+        eventDate,
+        location,
+        notes,
+        maxSeats,
+        imageUrl,
+        placeId,
+        placePhotoName,
+        rating,
+        totalBill,
+        status,
+      } = req.body;
       
       // Check if event exists
       const event = await storage.getEventById(eventId);
@@ -325,7 +406,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Event not found" });
       }
       
-      // Check if user is in the event's club
+      // Authorization: user must be picker OR club owner
       const clubs = await storage.getUserClubs(req.user!.id);
       const isInClub = clubs.some(c => c.id === event.clubId);
       if (!isInClub) {
@@ -333,13 +414,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           error: "You must be a member of the club to update events" 
         });
       }
+      const members = await storage.getClubMembers(event.clubId);
+      const isOwner = members.some(m => m.id === req.user!.id && m.role === "owner");
+      const isPicker = req.user!.id === event.pickerId;
+      if (!isOwner && !isPicker) {
+        return res.status(403).json({ error: "You must be the picker or an owner to update this event" });
+      }
       
-      // Update event
-      const updatedEvent = await storage.updateEvent(eventId, {
-        notes: notes !== undefined ? notes : undefined,
-        location: location !== undefined ? location : undefined,
-        maxSeats: maxSeats !== undefined ? maxSeats : undefined,
-      });
+      // Validate maxSeats if provided
+      if (maxSeats !== undefined && (typeof maxSeats !== "number" || maxSeats < 1 || maxSeats > 100)) {
+        return res.status(400).json({ error: "Max seats must be a number between 1 and 100" });
+      }
+      
+      const updates: any = {};
+      if (restaurantName !== undefined) updates.restaurantName = restaurantName;
+      if (cuisine !== undefined) updates.cuisine = cuisine;
+      if (eventDate !== undefined) updates.eventDate = new Date(eventDate);
+      if (location !== undefined) updates.location = location;
+      if (notes !== undefined) updates.notes = notes;
+      if (maxSeats !== undefined) updates.maxSeats = maxSeats;
+      if (imageUrl !== undefined) updates.imageUrl = imageUrl;
+      if (placeId !== undefined) updates.placeId = placeId;
+      if (placePhotoName !== undefined) updates.placePhotoName = placePhotoName;
+      if (rating !== undefined) updates.rating = rating;
+      if (totalBill !== undefined) updates.totalBill = totalBill;
+      if (status !== undefined) updates.status = status;
+      
+      const updatedEvent = await storage.updateEvent(eventId, updates);
       
       res.json(updatedEvent);
     } catch (error) {

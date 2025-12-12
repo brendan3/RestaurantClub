@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { getEventById, updateEvent, getEventRsvps, getUserRsvp, rsvpToEvent, addToWishlist } from "@/lib/api";
+import { getEventById, updateEvent, getEventRsvps, getUserRsvp, rsvpToEvent, addToWishlist, getEventImageUrl } from "@/lib/api";
 import { Heart } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
@@ -42,6 +42,23 @@ export default function EventDetail() {
   const [isAddingToWishlist, setIsAddingToWishlist] = useState(false);
   const [addedToWishlist, setAddedToWishlist] = useState(false);
 
+  // Details editing state
+  const canEditDetails = user && event && user.id === event.pickerId;
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [editValues, setEditValues] = useState({
+    restaurantName: "",
+    cuisine: "",
+    eventDate: "",
+    location: "",
+    notes: "",
+    maxSeats: undefined as number | undefined,
+    imageUrl: "",
+    rating: undefined as number | undefined,
+    totalBill: undefined as number | undefined,
+    status: "confirmed" as "pending" | "confirmed" | "past",
+  });
+  const [isSavingDetails, setIsSavingDetails] = useState(false);
+
   useEffect(() => {
     if (eventId) {
       loadEventData();
@@ -62,10 +79,49 @@ export default function EventDetail() {
       setRsvps(rsvpData);
       setUserRsvp(userRsvpData);
       setNotesValue(eventData.notes || "");
+      setEditValues({
+        restaurantName: eventData.restaurantName || "",
+        cuisine: eventData.cuisine || "",
+        eventDate: eventData.eventDate || "",
+        location: eventData.location || "",
+        notes: eventData.notes || "",
+        maxSeats: eventData.maxSeats ?? undefined,
+        imageUrl: eventData.imageUrl || "",
+        rating: eventData.rating ?? undefined,
+        totalBill: eventData.totalBill ?? undefined,
+        status: eventData.status,
+      });
     } catch (error: any) {
       toast.error(error.message || "Failed to load event");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSaveDetails = async () => {
+    if (!eventId) return;
+    setIsSavingDetails(true);
+    try {
+      const updated = await updateEvent(eventId, {
+        restaurantName: editValues.restaurantName,
+        cuisine: editValues.cuisine,
+        eventDate: editValues.eventDate ? new Date(editValues.eventDate).toISOString() : undefined,
+        location: editValues.location,
+        notes: editValues.notes,
+        maxSeats: editValues.maxSeats,
+        imageUrl: editValues.imageUrl,
+        rating: editValues.rating,
+        totalBill: editValues.totalBill,
+        status: editValues.status,
+      });
+      setEvent(updated);
+      setNotesValue(updated.notes || "");
+      setIsEditingDetails(false);
+      toast.success("Event details updated");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update event");
+    } finally {
+      setIsSavingDetails(false);
     }
   };
 
@@ -226,6 +282,12 @@ export default function EventDetail() {
 
   const isFull = event.maxSeats && attendingCount >= event.maxSeats;
 
+  const formatDateTimeLocal = (value: string) => {
+    if (!value) return "";
+    const d = new Date(value);
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  };
+
   return (
     <div className="space-y-8">
       {/* Back Button */}
@@ -239,7 +301,7 @@ export default function EventDetail() {
       <div className="relative overflow-hidden rounded-[2.5rem] bg-foreground text-background shadow-float">
         <div className="absolute inset-0">
           <img 
-            src={event.imageUrl || "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1000&q=80"} 
+            src={getEventImageUrl(event, 1200)} 
             alt={event.restaurantName} 
             className="w-full h-full object-cover opacity-50" 
           />
@@ -275,6 +337,203 @@ export default function EventDetail() {
       <div className="grid md:grid-cols-3 gap-8">
         {/* Main Content */}
         <div className="md:col-span-2 space-y-6">
+          {/* Editable Details */}
+          <Card className="border-none shadow-soft">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2 font-heading">
+                🧾 Event Details
+              </CardTitle>
+              {canEditDetails && (
+                !isEditingDetails ? (
+                  <Button size="sm" variant="outline" className="rounded-full" onClick={() => setIsEditingDetails(true)}>
+                    <Edit2 className="w-4 h-4 mr-1" /> Edit details
+                  </Button>
+                ) : (
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="ghost" className="rounded-full" onClick={() => {
+                      setEditValues({
+                        restaurantName: event.restaurantName || "",
+                        cuisine: event.cuisine || "",
+                        eventDate: event.eventDate || "",
+                        location: event.location || "",
+                        notes: event.notes || "",
+                        maxSeats: event.maxSeats ?? undefined,
+                        imageUrl: event.imageUrl || "",
+                        rating: event.rating ?? undefined,
+                        totalBill: event.totalBill ?? undefined,
+                        status: event.status,
+                      });
+                      setIsEditingDetails(false);
+                    }}>
+                      <X className="w-4 h-4 mr-1" /> Cancel
+                    </Button>
+                    <Button size="sm" className="rounded-full" onClick={handleSaveDetails} disabled={isSavingDetails}>
+                      <Save className="w-4 h-4 mr-1" /> {isSavingDetails ? "Saving..." : "Save"}
+                    </Button>
+                  </div>
+                )
+              )}
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {isEditingDetails ? (
+                <div className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Restaurant Name</label>
+                      <input
+                        className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+                        value={editValues.restaurantName}
+                        onChange={(e) => setEditValues(prev => ({ ...prev, restaurantName: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Cuisine</label>
+                      <input
+                        className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+                        value={editValues.cuisine}
+                        onChange={(e) => setEditValues(prev => ({ ...prev, cuisine: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Date & Time</label>
+                      <input
+                        type="datetime-local"
+                        className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+                        value={formatDateTimeLocal(editValues.eventDate)}
+                        onChange={(e) => setEditValues(prev => ({ ...prev, eventDate: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Location</label>
+                      <input
+                        className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+                        value={editValues.location}
+                        onChange={(e) => setEditValues(prev => ({ ...prev, location: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Cover Image URL</label>
+                      <input
+                        className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+                        value={editValues.imageUrl}
+                        onChange={(e) => setEditValues(prev => ({ ...prev, imageUrl: e.target.value }))}
+                        placeholder="https://example.com/photo.jpg"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Max Seats</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+                        value={editValues.maxSeats ?? ""}
+                        onChange={(e) => setEditValues(prev => ({ ...prev, maxSeats: e.target.value ? parseInt(e.target.value, 10) : undefined }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Rating (1-5)</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={5}
+                        step={0.1}
+                        className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+                        value={editValues.rating ?? ""}
+                        onChange={(e) => setEditValues(prev => ({ ...prev, rating: e.target.value ? parseFloat(e.target.value) : undefined }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Total Bill</label>
+                      <input
+                        type="number"
+                        min={0}
+                        className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+                        value={editValues.totalBill ?? ""}
+                        onChange={(e) => setEditValues(prev => ({ ...prev, totalBill: e.target.value ? parseFloat(e.target.value) : undefined }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Status</label>
+                    <select
+                      className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+                      value={editValues.status}
+                      onChange={(e) => setEditValues(prev => ({ ...prev, status: e.target.value as "pending" | "confirmed" | "past" }))}
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="confirmed">Confirmed</option>
+                      <option value="past">Past</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Notes</label>
+                    <Textarea
+                      value={editValues.notes}
+                      onChange={(e) => setEditValues(prev => ({ ...prev, notes: e.target.value }))}
+                      placeholder="Add notes about this event... dress code, menu highlights, special occasion, etc."
+                      className="min-h-[100px] rounded-xl resize-none"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 gap-4 text-sm text-muted-foreground">
+                  <div>
+                    <p className="font-semibold text-foreground">Restaurant</p>
+                    <p>{event.restaurantName}</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">Cuisine</p>
+                    <p>{event.cuisine}</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">Date</p>
+                    <p>{eventDate.toLocaleString()}</p>
+                  </div>
+                  {event.location && (
+                    <div>
+                      <p className="font-semibold text-foreground">Location</p>
+                      <p>{event.location}</p>
+                    </div>
+                  )}
+                  {event.maxSeats && (
+                    <div>
+                      <p className="font-semibold text-foreground">Capacity</p>
+                      <p>{event.maxSeats} seats</p>
+                    </div>
+                  )}
+                  {event.totalBill && (
+                    <div>
+                      <p className="font-semibold text-foreground">Total Bill</p>
+                      <p>${event.totalBill}</p>
+                    </div>
+                  )}
+                  {event.rating && (
+                    <div>
+                      <p className="font-semibold text-foreground">Rating</p>
+                      <p>{event.rating}/5</p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="font-semibold text-foreground">Status</p>
+                    <p className="capitalize">{event.status}</p>
+                  </div>
+                  {event.notes && (
+                    <div className="md:col-span-2">
+                      <p className="font-semibold text-foreground">Notes</p>
+                      <p className="text-muted-foreground whitespace-pre-wrap">{event.notes}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
           {/* Notes Section */}
           <Card className="border-none shadow-soft">
             <CardHeader className="flex flex-row items-center justify-between">

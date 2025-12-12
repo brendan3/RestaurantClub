@@ -21,7 +21,20 @@ export interface IStorage {
   getPastEvents(clubId?: string): Promise<Event[]>;
   getEventById(id: string): Promise<Event | undefined>;
   createEvent(event: any): Promise<Event>;
-  updateEvent(id: string, updates: { notes?: string; location?: string; maxSeats?: number }): Promise<Event>;
+  updateEvent(id: string, updates: {
+    restaurantName?: string;
+    cuisine?: string;
+    eventDate?: Date;
+    location?: string;
+    notes?: string;
+    maxSeats?: number;
+    imageUrl?: string;
+    placeId?: string | null;
+    placePhotoName?: string | null;
+    rating?: number | null;
+    totalBill?: number | null;
+    status?: string;
+  }): Promise<Event>;
   createRsvp(eventId: string, userId: string, status: string): Promise<void>;
   updateRsvp(eventId: string, userId: string, status: string): Promise<void>;
   getEventRsvps(eventId: string): Promise<any[]>;
@@ -33,6 +46,8 @@ export interface IStorage {
   getClubByJoinCode(joinCode: string): Promise<Club | undefined>;
   createClub(club: any): Promise<Club>;
   updateClubJoinCode(clubId: string, joinCode: string): Promise<void>;
+  updateClub(clubId: string, updates: { name?: string; type?: string }): Promise<Club>;
+  updateUserProfile(userId: string, data: { name?: string; avatar?: string | null }): Promise<User>;
   addClubMember(clubId: string, userId: string, role?: string): Promise<void>;
   isUserInClub(userId: string, clubId: string): Promise<boolean>;
   getClubMembers(clubId: string): Promise<any[]>;
@@ -142,7 +157,23 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented");
   }
 
-  async updateEvent(): Promise<Event> {
+  async updateEvent(
+    id: string,
+    _updates: {
+      restaurantName?: string;
+      cuisine?: string;
+      eventDate?: Date;
+      location?: string;
+      notes?: string;
+      maxSeats?: number;
+      imageUrl?: string;
+      placeId?: string | null;
+      placePhotoName?: string | null;
+      rating?: number | null;
+      totalBill?: number | null;
+      status?: string;
+    }
+  ): Promise<Event> {
     throw new Error("Not implemented");
   }
 
@@ -167,7 +198,18 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented");
   }
 
-  async addClubMember(): Promise<void> {
+  async updateClub(
+    _clubId: string,
+    _updates: { name?: string; type?: string }
+  ): Promise<Club> {
+    throw new Error("Not implemented");
+  }
+
+  async addClubMember(
+    _clubId: string,
+    _userId: string,
+    _role: string = "member"
+  ): Promise<void> {
     throw new Error("Not implemented");
   }
 
@@ -204,6 +246,13 @@ export class MemStorage implements IStorage {
       totalDinners: 14,
       avgBill: 45
     };
+  }
+
+  async updateUserProfile(
+    _userId: string,
+    _data: { name?: string; avatar?: string | null }
+  ): Promise<User> {
+    throw new Error("Not implemented");
   }
 
   // Wishlist methods

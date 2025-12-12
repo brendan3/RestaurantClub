@@ -130,6 +130,12 @@ export default function History() {
                 <Calendar className="w-4 h-4" />
                   {new Date(event.eventDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
               </div>
+
+                {event.notes && (
+                  <p className="mt-2 text-xs text-muted-foreground line-clamp-2">
+                    {event.notes}
+                  </p>
+                )}
             </CardContent>
 
             <CardFooter className="p-5 pt-0 border-t border-border/50 mt-auto">

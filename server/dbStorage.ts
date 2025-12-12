@@ -110,11 +110,33 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async updateEvent(id: string, updates: { notes?: string; location?: string; maxSeats?: number }): Promise<Event> {
+  async updateEvent(id: string, updates: {
+    restaurantName?: string;
+    cuisine?: string;
+    eventDate?: Date;
+    location?: string;
+    notes?: string;
+    maxSeats?: number;
+    imageUrl?: string;
+    placeId?: string | null;
+    placePhotoName?: string | null;
+    rating?: number | null;
+    totalBill?: number | null;
+    status?: string;
+  }): Promise<Event> {
     const updateData: any = {};
-    if (updates.notes !== undefined) updateData.notes = updates.notes;
+    if (updates.restaurantName !== undefined) updateData.restaurantName = updates.restaurantName;
+    if (updates.cuisine !== undefined) updateData.cuisine = updates.cuisine;
+    if (updates.eventDate !== undefined) updateData.eventDate = updates.eventDate;
     if (updates.location !== undefined) updateData.location = updates.location;
+    if (updates.notes !== undefined) updateData.notes = updates.notes;
     if (updates.maxSeats !== undefined) updateData.maxSeats = updates.maxSeats;
+    if (updates.imageUrl !== undefined) updateData.imageUrl = updates.imageUrl;
+    if (updates.placeId !== undefined) updateData.placeId = updates.placeId;
+    if (updates.placePhotoName !== undefined) updateData.placePhotoName = updates.placePhotoName;
+    if (updates.rating !== undefined) updateData.rating = updates.rating;
+    if (updates.totalBill !== undefined) updateData.totalBill = updates.totalBill;
+    if (updates.status !== undefined) updateData.status = updates.status;
     
     const result = await db
       .update(events)
@@ -164,6 +186,18 @@ export class DatabaseStorage implements IStorage {
       .update(clubs)
       .set({ joinCode })
       .where(eq(clubs.id, clubId));
+  }
+
+  async updateClub(clubId: string, updates: { name?: string; type?: string }): Promise<Club> {
+    const updateData: any = {};
+    if (updates.name !== undefined) updateData.name = updates.name;
+    if (updates.type !== undefined) updateData.type = updates.type;
+    const result = await db
+      .update(clubs)
+      .set(updateData)
+      .where(eq(clubs.id, clubId))
+      .returning();
+    return result[0];
   }
 
   async addClubMember(clubId: string, userId: string, role: string = "member"): Promise<void> {
@@ -298,6 +332,18 @@ export class DatabaseStorage implements IStorage {
       totalDinners,
       avgBill: Math.round(avgBill),
     };
+  }
+
+  async updateUserProfile(userId: string, data: { name?: string; avatar?: string | null }): Promise<User> {
+    const updateData: any = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.avatar !== undefined) updateData.avatar = data.avatar;
+    const result = await db
+      .update(users)
+      .set(updateData)
+      .where(eq(users.id, userId))
+      .returning();
+    return result[0];
   }
 
   // Wishlist methods
