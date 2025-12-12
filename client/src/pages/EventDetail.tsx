@@ -34,6 +34,7 @@ export default function EventDetail() {
   const [photos, setPhotos] = useState<EventPhoto[]>([]);
   const [isPhotosLoading, setIsPhotosLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [activeHeroPhotoIndex, setActiveHeroPhotoIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isAddingToWishlist, setIsAddingToWishlist] = useState(false);
   const [addedToWishlist, setAddedToWishlist] = useState(false);
@@ -82,6 +83,17 @@ export default function EventDetail() {
       cancelled = true;
     };
   }, [event?.id]);
+
+  // Keep active hero index in range as photos change
+  useEffect(() => {
+    if (photos.length === 0) {
+      if (activeHeroPhotoIndex !== 0) setActiveHeroPhotoIndex(0);
+      return;
+    }
+    if (activeHeroPhotoIndex > photos.length - 1) {
+      setActiveHeroPhotoIndex(0);
+    }
+  }, [photos.length, activeHeroPhotoIndex]);
 
   const loadEventData = async () => {
     if (!eventId) return;
@@ -195,6 +207,26 @@ export default function EventDetail() {
   };
 
   const isPastEvent = !!event && new Date(event.eventDate) < new Date();
+  const hasRecapPhotos = isPastEvent && photos.length > 0;
+
+  const heroImageUrl = (() => {
+    // If event is in the past and we have recap photos, use them
+    if (hasRecapPhotos) {
+      return photos[activeHeroPhotoIndex]?.imageUrl ?? photos[0].imageUrl;
+    }
+    // Otherwise, fallback to existing behavior
+    return event ? getEventImageUrl(event, 1200) : undefined;
+  })();
+
+  const goToPrevHeroPhoto = () => {
+    if (photos.length <= 1) return;
+    setActiveHeroPhotoIndex((prev) => (prev === 0 ? photos.length - 1 : prev - 1));
+  };
+
+  const goToNextHeroPhoto = () => {
+    if (photos.length <= 1) return;
+    setActiveHeroPhotoIndex((prev) => (prev === photos.length - 1 ? 0 : prev + 1));
+  };
 
   const handlePhotoClick = () => {
     if (!isPastEvent) return;
@@ -217,6 +249,7 @@ export default function EventDetail() {
       }
       // newest first in UI
       setPhotos(prev => [...uploaded, ...prev]);
+      setActiveHeroPhotoIndex(0);
       toast.success(`Uploaded ${uploaded.length} photo${uploaded.length !== 1 ? "s" : ""}`);
     } catch (err: any) {
       console.error("Upload failed", err);
@@ -310,12 +343,51 @@ export default function EventDetail() {
       <div className="relative overflow-hidden rounded-[2.5rem] bg-foreground text-background shadow-float">
         <div className="absolute inset-0">
           <img 
-            src={getEventImageUrl(event, 1200)} 
+            src={heroImageUrl} 
             alt={event.restaurantName} 
             className="w-full h-full object-cover opacity-50" 
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
         </div>
+
+        {/* Hero gallery controls (past events with recap photos) */}
+        {hasRecapPhotos && photos.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={goToPrevHeroPhoto}
+              aria-label="Previous photo"
+              className="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full text-white transition-all hover:scale-110"
+            >
+              <span className="sr-only">Previous</span>
+              ‹
+            </button>
+            <button
+              type="button"
+              onClick={goToNextHeroPhoto}
+              aria-label="Next photo"
+              className="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full text-white transition-all hover:scale-110"
+            >
+              <span className="sr-only">Next</span>
+              ›
+            </button>
+
+            {/* Dot indicators */}
+            <div className="absolute bottom-4 right-4 z-10 flex gap-1.5 bg-white/10 backdrop-blur-sm px-3 py-2 rounded-full">
+              {photos.map((p, idx) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  aria-label={`Show photo ${idx + 1}`}
+                  onClick={() => setActiveHeroPhotoIndex(idx)}
+                  className={`w-2.5 h-2.5 rounded-full transition-all ${
+                    idx === activeHeroPhotoIndex ? "bg-white" : "bg-white/40 hover:bg-white/70"
+                  }`}
+                />
+              ))}
+            </div>
+          </>
+        )}
         
         <div className="relative p-8 md:p-10 min-h-[300px] flex flex-col justify-end">
           <Badge className="bg-white/20 backdrop-blur-md text-white hover:bg-white/30 border-none px-4 py-1.5 text-sm font-medium rounded-full w-fit mb-4">
@@ -617,7 +689,7 @@ export default function EventDetail() {
               ) : photos.length > 0 ? (
                 <div className="overflow-x-auto pb-2">
                   <div className="flex gap-3">
-                    {photos.map((photo) => (
+                    {photos.map((photo, idx) => (
                       <div
                         key={photo.id}
                         className="relative flex-shrink-0 w-32 h-32 rounded-xl overflow-hidden border border-muted/40 bg-muted"
@@ -627,6 +699,7 @@ export default function EventDetail() {
                           alt="Event photo"
                           className="w-full h-full object-cover"
                           loading="lazy"
+                          onClick={() => setActiveHeroPhotoIndex(idx)}
                         />
                       </div>
                     ))}
