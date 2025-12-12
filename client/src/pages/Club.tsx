@@ -13,16 +13,21 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { getUserClubs, getWishlist, type Club as ClubType, type WishlistRestaurant } from "@/lib/api";
+import { getUserClubs, getWishlist, updateClub, type Club as ClubType, type WishlistRestaurant } from "@/lib/api";
 import { toast } from "sonner";
 import { useEventModal } from "@/lib/event-modal-context";
+import { useAuth } from "@/lib/auth-context";
 
 export default function Club() {
+  const { user } = useAuth();
   const [clubs, setClubs] = useState<ClubType[]>([]);
   const [wishlist, setWishlist] = useState<WishlistRestaurant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [isSavingClub, setIsSavingClub] = useState(false);
   const { setIsAddEventOpen } = useEventModal();
 
   useEffect(() => {
@@ -106,12 +111,25 @@ Sign up at the app and enter the code to join!`;
   }
 
   const club = clubs[0]; // MVP: one club per user
+  const isOwner = user && club.membersList?.some(m => m.id === user.id && m.role === "owner");
 
   return (
     <div className="space-y-10">
       <div className="text-center max-w-2xl mx-auto space-y-4">
         <img src={ASSETS.mascot} alt="Mascot" className="w-24 h-24 mx-auto object-contain animate-bounce-slow" />
-        <h1 className="text-3xl md:text-4xl font-heading font-bold text-foreground">{club.name}</h1>
+        <div className="flex items-center justify-center gap-2 flex-wrap">
+          <h1 className="text-3xl md:text-4xl font-heading font-bold text-foreground">{club.name}</h1>
+          {isOwner && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-full"
+              onClick={() => { setNewName(club.name); setIsEditingName(true); }}
+            >
+              Edit name
+            </Button>
+          )}
+        </div>
         <p className="text-muted-foreground text-lg">
           Est. {new Date(club.createdAt).getFullYear()} • {club.members} Member{club.members !== 1 ? 's' : ''}
         </p>
@@ -215,6 +233,53 @@ Sign up at the app and enter the code to join!`;
           </Button>
         )}
       </div>
+
+      {/* Edit Club Name Modal */}
+      {isOwner && (
+        <Dialog open={isEditingName} onOpenChange={setIsEditingName}>
+          <DialogContent className="sm:max-w-[420px] rounded-[1.25rem]">
+            <DialogHeader>
+              <DialogTitle>Edit Club Name</DialogTitle>
+              <DialogDescription>Update the name of your club.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <label className="text-sm font-medium">Club Name</label>
+              <input
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="Club name"
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button variant="ghost" onClick={() => setIsEditingName(false)}>Cancel</Button>
+              <Button
+                onClick={async () => {
+                  if (!newName.trim()) {
+                    toast.error("Club name cannot be empty");
+                    return;
+                  }
+                  setIsSavingClub(true);
+                  try {
+                    const updated = await updateClub(club.id, { name: newName.trim() });
+                    setClubs([updated, ...clubs.slice(1)]);
+                    toast.success("Club name updated");
+                    setIsEditingName(false);
+                  } catch (error: any) {
+                    toast.error(error.message || "Failed to update club");
+                  } finally {
+                    setIsSavingClub(false);
+                  }
+                }}
+                disabled={isSavingClub}
+              >
+                {isSavingClub ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Invite Modal */}
       <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
