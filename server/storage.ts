@@ -21,6 +21,7 @@ export interface IStorage {
   getPastEvents(clubId?: string): Promise<Event[]>;
   getEventById(id: string): Promise<Event | undefined>;
   createEvent(event: any): Promise<Event>;
+  deleteEvent(id: string): Promise<void>;
   updateEvent(id: string, updates: {
     restaurantName?: string;
     cuisine?: string;
@@ -165,6 +166,10 @@ export class MemStorage implements IStorage {
   }
 
   async createEvent(): Promise<Event> {
+    throw new Error("Not implemented");
+  }
+
+  async deleteEvent(): Promise<void> {
     throw new Error("Not implemented");
   }
 

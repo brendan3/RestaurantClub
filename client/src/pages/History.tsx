@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Star, MapPin, Calendar, Filter, Search, UtensilsCrossed } from "lucide-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { getPastEvents, getEventImageUrl, type Event } from "@/lib/api";
 import { toast } from "sonner";
 
 export default function History() {
+  const [, navigate] = useLocation();
   const [pastEvents, setPastEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -84,7 +85,19 @@ export default function History() {
       ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredEvents.map((event) => (
-          <Card key={event.id} className="border-none shadow-soft group overflow-hidden flex flex-col h-full">
+          <Card
+            key={event.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => navigate(`/event/${event.id}`)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                navigate(`/event/${event.id}`);
+              }
+            }}
+            className="border-none shadow-soft group overflow-hidden flex flex-col h-full cursor-pointer hover:-translate-y-0.5 transition-transform"
+          >
               <div className="relative h-48 overflow-hidden bg-muted">
               <img 
                   src={getEventImageUrl(event, 800)} 
@@ -144,7 +157,12 @@ export default function History() {
                     <span className="text-xs text-muted-foreground">Event</span>
                   </div>
                   <Button asChild variant="ghost" size="sm" className="text-xs h-8 text-primary hover:text-primary hover:bg-primary/10">
-                    <Link href={`/event/${event.id}`}>View Details</Link>
+                    <Link
+                      href={`/event/${event.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      View Details
+                    </Link>
                 </Button>
               </div>
             </CardFooter>

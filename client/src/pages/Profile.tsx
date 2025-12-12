@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Settings, Award, Star, LogOut, Users, User, Bell, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { logout, getUserClubs, getWishlist, removeFromWishlist, updateUserProfile, type Club, type WishlistRestaurant } from "@/lib/api";
+import { logout, getUserClubs, getWishlist, removeFromWishlist, updateUserProfile, uploadUserAvatar, type Club, type WishlistRestaurant } from "@/lib/api";
 import { toast } from "sonner";
 import { Trash2, Heart } from "lucide-react";
 
@@ -29,6 +29,15 @@ export default function Profile() {
     name: user?.name ?? "",
     avatar: user?.avatar ?? "",
   });
+  const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (avatarPreviewUrl) URL.revokeObjectURL(avatarPreviewUrl);
+    };
+  }, [avatarPreviewUrl]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -70,18 +79,48 @@ export default function Profile() {
   const handleSaveProfile = async () => {
     setIsSavingProfile(true);
     try {
+      let avatar: string | null = profileForm.avatar || null;
+
+      if (selectedAvatarFile) {
+        try {
+          const uploadedUrl = await uploadUserAvatar(selectedAvatarFile);
+          avatar = uploadedUrl;
+        } catch (err: any) {
+          // If Cloudinary disabled (501), fall back to URL-only behavior
+          if (err?.message?.toLowerCase().includes("cloudinary not configured")) {
+            toast.error("Image uploads are not available right now; you can still paste an Avatar URL.");
+          } else {
+            toast.error("Failed to upload image. You can still paste an Avatar URL.");
+          }
+        }
+      }
+
       const updated = await updateUserProfile({
         name: profileForm.name,
-        avatar: profileForm.avatar || null,
+        avatar,
       });
       setUser(updated);
       toast.success("Profile updated!");
       setIsEditProfileOpen(false);
+      setSelectedAvatarFile(null);
+      if (avatarPreviewUrl) URL.revokeObjectURL(avatarPreviewUrl);
+      setAvatarPreviewUrl(null);
     } catch (error: any) {
       toast.error(error.message || "Failed to update profile");
     } finally {
       setIsSavingProfile(false);
     }
+  };
+
+  const openEditProfile = () => {
+    setProfileForm({
+      name: user?.name ?? "",
+      avatar: user?.avatar ?? "",
+    });
+    setSelectedAvatarFile(null);
+    if (avatarPreviewUrl) URL.revokeObjectURL(avatarPreviewUrl);
+    setAvatarPreviewUrl(null);
+    setIsEditProfileOpen(true);
   };
 
   if (!user) {
@@ -90,10 +129,17 @@ export default function Profile() {
   return (
     <div className="max-w-2xl mx-auto space-y-8">
       <div className="text-center space-y-4">
-        <Avatar className="w-32 h-32 mx-auto border-4 border-background shadow-xl">
-          <AvatarImage src={user.avatar || undefined} />
-          <AvatarFallback>{user.name[0]}</AvatarFallback>
-        </Avatar>
+        <button
+          type="button"
+          onClick={openEditProfile}
+          className="group inline-flex items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-primary/40"
+          aria-label="Edit profile"
+        >
+          <Avatar className="w-32 h-32 mx-auto border-4 border-background shadow-xl transition-transform group-hover:scale-[1.02]">
+            <AvatarImage src={user.avatar || undefined} />
+            <AvatarFallback>{user.name[0]}</AvatarFallback>
+          </Avatar>
+        </button>
         <div>
           <h1 className="text-3xl font-heading font-bold">{user.name}</h1>
           <p className="text-muted-foreground">
@@ -226,13 +272,7 @@ export default function Profile() {
             {/* Edit Profile */}
             <div
               className="flex items-center justify-between p-4 bg-muted/30 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer"
-              onClick={() => {
-                setProfileForm({
-                  name: user?.name ?? "",
-                  avatar: user?.avatar ?? "",
-                });
-                setIsEditProfileOpen(true);
-              }}
+              onClick={openEditProfile}
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
@@ -306,11 +346,51 @@ export default function Profile() {
           <div className="space-y-4">
             <div className="flex items-center gap-4">
               <Avatar className="w-16 h-16">
-                <AvatarImage src={profileForm.avatar || undefined} />
+                <AvatarImage src={(avatarPreviewUrl || profileForm.avatar) || undefined} />
                 <AvatarFallback>{profileForm.name?.[0] ?? "?"}</AvatarFallback>
               </Avatar>
-              <div className="text-sm text-muted-foreground">
-                Preview of your avatar
+              <div className="space-y-2">
+                <div className="text-sm text-muted-foreground">Preview of your avatar</div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full"
+                    onClick={() => avatarFileInputRef.current?.click()}
+                  >
+                    Upload photo
+                  </Button>
+                  {selectedAvatarFile && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-full"
+                      onClick={() => {
+                        setSelectedAvatarFile(null);
+                        if (avatarPreviewUrl) URL.revokeObjectURL(avatarPreviewUrl);
+                        setAvatarPreviewUrl(null);
+                      }}
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
+                <input
+                  ref={avatarFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (avatarPreviewUrl) URL.revokeObjectURL(avatarPreviewUrl);
+                    setSelectedAvatarFile(file);
+                    setAvatarPreviewUrl(URL.createObjectURL(file));
+                    e.target.value = "";
+                  }}
+                />
               </div>
             </div>
             <div className="space-y-2">
@@ -333,7 +413,7 @@ export default function Profile() {
                 placeholder="https://example.com/photo.jpg"
               />
               <p className="text-xs text-muted-foreground">
-                Paste a photo URL (Twitter, Instagram, or any image host). Uploads coming later.
+                Paste a photo URL (Twitter, Instagram, or any image host). Or upload above.
               </p>
             </div>
           </div>

@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { useRoute, Link } from "wouter";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useRoute, Link, useLocation } from "wouter";
 import { 
   Calendar, Clock, MapPin, Users, ArrowLeft, Edit2, Save, X, 
   Camera, Check
@@ -9,7 +9,26 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { getEventById, updateEvent, getEventRsvps, getUserRsvp, rsvpToEvent, addToWishlist, getEventImageUrl, getEventPhotos, uploadEventPhoto, type EventPhoto } from "@/lib/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  getEventById,
+  updateEvent,
+  getEventRsvps,
+  getUserRsvp,
+  rsvpToEvent,
+  addToWishlist,
+  getEventImageUrl,
+  getEventPhotos,
+  uploadEventPhoto,
+  deleteEvent,
+  type EventPhoto,
+} from "@/lib/api";
 import { Heart } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
@@ -17,6 +36,7 @@ import { toast } from "sonner";
 export default function EventDetail() {
   const [, params] = useRoute("/event/:id");
   const { user } = useAuth();
+  const [, navigate] = useLocation();
   const eventId = params?.id;
 
   const [event, setEvent] = useState<any>(null);
@@ -36,6 +56,10 @@ export default function EventDetail() {
   const [isUploading, setIsUploading] = useState(false);
   const [activeHeroPhotoIndex, setActiveHeroPhotoIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isDeletingEvent, setIsDeletingEvent] = useState(false);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [activeLightboxIndex, setActiveLightboxIndex] = useState(0);
   const [isAddingToWishlist, setIsAddingToWishlist] = useState(false);
   const [addedToWishlist, setAddedToWishlist] = useState(false);
 
@@ -228,6 +252,30 @@ export default function EventDetail() {
     setActiveHeroPhotoIndex((prev) => (prev === photos.length - 1 ? 0 : prev + 1));
   };
 
+  const galleryImages = useMemo(() => {
+    if (photos.length > 0) {
+      return photos.map((p) => p.imageUrl);
+    }
+    return heroImageUrl ? [heroImageUrl] : [];
+  }, [photos, heroImageUrl]);
+
+  const handleHeroClick = () => {
+    if (galleryImages.length === 0) return;
+    // If we have recap photos, start from the current hero index. Otherwise single image.
+    setActiveLightboxIndex(photos.length > 0 ? activeHeroPhotoIndex : 0);
+    setIsLightboxOpen(true);
+  };
+
+  const goToPrevLightbox = () => {
+    if (galleryImages.length <= 1) return;
+    setActiveLightboxIndex((prev) => (prev === 0 ? galleryImages.length - 1 : prev - 1));
+  };
+
+  const goToNextLightbox = () => {
+    if (galleryImages.length <= 1) return;
+    setActiveLightboxIndex((prev) => (prev === galleryImages.length - 1 ? 0 : prev + 1));
+  };
+
   const handlePhotoClick = () => {
     if (!isPastEvent) return;
     fileInputRef.current?.click();
@@ -340,7 +388,18 @@ export default function EventDetail() {
       </Button>
 
       {/* Hero Section */}
-      <div className="relative overflow-hidden rounded-[2.5rem] bg-foreground text-background shadow-float">
+      <div
+        className="relative overflow-hidden rounded-[2.5rem] bg-foreground text-background shadow-float cursor-pointer"
+        role="button"
+        tabIndex={0}
+        onClick={handleHeroClick}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            handleHeroClick();
+          }
+        }}
+      >
         <div className="absolute inset-0">
           <img 
             src={heroImageUrl} 
@@ -355,7 +414,10 @@ export default function EventDetail() {
           <>
             <button
               type="button"
-              onClick={goToPrevHeroPhoto}
+              onClick={(e) => {
+                e.stopPropagation();
+                goToPrevHeroPhoto();
+              }}
               aria-label="Previous photo"
               className="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full text-white transition-all hover:scale-110"
             >
@@ -364,7 +426,10 @@ export default function EventDetail() {
             </button>
             <button
               type="button"
-              onClick={goToNextHeroPhoto}
+              onClick={(e) => {
+                e.stopPropagation();
+                goToNextHeroPhoto();
+              }}
               aria-label="Next photo"
               className="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full text-white transition-all hover:scale-110"
             >
@@ -379,7 +444,10 @@ export default function EventDetail() {
                   key={p.id}
                   type="button"
                   aria-label={`Show photo ${idx + 1}`}
-                  onClick={() => setActiveHeroPhotoIndex(idx)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveHeroPhotoIndex(idx);
+                  }}
                   className={`w-2.5 h-2.5 rounded-full transition-all ${
                     idx === activeHeroPhotoIndex ? "bg-white" : "bg-white/40 hover:bg-white/70"
                   }`}
@@ -426,9 +494,19 @@ export default function EventDetail() {
               </CardTitle>
               {canEditDetails && (
                 !isEditingDetails ? (
-                  <Button size="sm" variant="outline" className="rounded-full" onClick={() => setIsEditingDetails(true)}>
-                    <Edit2 className="w-4 h-4 mr-1" /> Edit details
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" className="rounded-full" onClick={() => setIsEditingDetails(true)}>
+                      <Edit2 className="w-4 h-4 mr-1" /> Edit details
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="rounded-full"
+                      onClick={() => setIsDeleteOpen(true)}
+                    >
+                      Delete event
+                    </Button>
+                  </div>
                 ) : (
                   <div className="flex gap-2">
                     <Button size="sm" variant="ghost" className="rounded-full" onClick={() => {
@@ -450,6 +528,14 @@ export default function EventDetail() {
                     </Button>
                     <Button size="sm" className="rounded-full" onClick={handleSaveDetails} disabled={isSavingDetails}>
                       <Save className="w-4 h-4 mr-1" /> {isSavingDetails ? "Saving..." : "Save"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="rounded-full"
+                      onClick={() => setIsDeleteOpen(true)}
+                    >
+                      Delete
                     </Button>
                   </div>
                 )
@@ -699,7 +785,10 @@ export default function EventDetail() {
                           alt="Event photo"
                           className="w-full h-full object-cover"
                           loading="lazy"
-                          onClick={() => setActiveHeroPhotoIndex(idx)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveHeroPhotoIndex(idx);
+                          }}
                         />
                       </div>
                     ))}
@@ -872,6 +961,98 @@ export default function EventDetail() {
           </Card>
         </div>
       </div>
+
+      {/* Delete Event Confirmation */}
+      <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <DialogContent className="sm:max-w-[480px] rounded-[1.25rem]">
+          <DialogHeader>
+            <DialogTitle>Delete this event?</DialogTitle>
+            <DialogDescription>
+              This will remove the event, RSVPs, and recap photos for your club. This can’t be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="ghost" onClick={() => setIsDeleteOpen(false)} disabled={isDeletingEvent}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                if (!event?.id) return;
+                setIsDeletingEvent(true);
+                try {
+                  await deleteEvent(event.id);
+                  toast.success("Event deleted");
+                  setIsDeleteOpen(false);
+                  navigate("/history");
+                } catch (err) {
+                  console.error(err);
+                  toast.error("Failed to delete event. Please try again.");
+                } finally {
+                  setIsDeletingEvent(false);
+                }
+              }}
+              disabled={isDeletingEvent}
+            >
+              {isDeletingEvent ? "Deleting..." : "Delete event"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Lightbox */}
+      <Dialog
+        open={isLightboxOpen}
+        onOpenChange={(open) => {
+          setIsLightboxOpen(open);
+          if (!open && photos.length > 0) {
+            // Keep hero in sync with last viewed lightbox image
+            setActiveHeroPhotoIndex(activeLightboxIndex);
+          }
+        }}
+      >
+        <DialogContent className="max-w-4xl w-full bg-black/95 border-none p-0 overflow-hidden">
+          <div className="relative flex items-center justify-center">
+            {galleryImages[activeLightboxIndex] && (
+              <img
+                src={galleryImages[activeLightboxIndex]}
+                alt={event?.restaurantName ?? "Event photo"}
+                className="max-h-[80vh] w-auto object-contain"
+              />
+            )}
+
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={() => setIsLightboxOpen(false)}
+              className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur flex items-center justify-center"
+            >
+              ×
+            </button>
+
+            {galleryImages.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  aria-label="Previous photo"
+                  onClick={goToPrevLightbox}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur flex items-center justify-center"
+                >
+                  ‹
+                </button>
+                <button
+                  type="button"
+                  aria-label="Next photo"
+                  onClick={goToNextLightbox}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur flex items-center justify-center"
+                >
+                  ›
+                </button>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

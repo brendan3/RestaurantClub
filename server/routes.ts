@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { mockEvents, mockUser, mockClubs } from "./mockData";
 import * as auth from "./auth";
 import { generateJoinCode } from "@shared/schema";
-import { isCloudinaryConfigured, uploadEventImage } from "./cloudinary";
+import { isCloudinaryConfigured, uploadEventImage, uploadUserAvatar } from "./cloudinary";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const useMockData = !process.env.DATABASE_URL;
@@ -52,6 +52,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err) {
       console.error("Error updating profile:", err);
       res.status(500).json({ error: "Failed to update profile" });
+    }
+  });
+
+  // Upload current user avatar to Cloudinary (returns URL, does not update DB)
+  app.post("/api/user/me/avatar-upload", auth.requireAuth, async (req, res) => {
+    try {
+      if (!isCloudinaryConfigured()) {
+        return res.status(501).json({ error: "Cloudinary not configured" });
+      }
+
+      const { dataUrl } = req.body as { dataUrl?: string };
+      if (!dataUrl || typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {
+        return res.status(400).json({ error: "dataUrl must be a valid image data URL" });
+      }
+
+      const imageUrl = await uploadUserAvatar(req.user!.id, dataUrl);
+      res.json({ imageUrl });
+    } catch (err) {
+      console.error("Error uploading avatar:", err);
+      res.status(500).json({ error: "Failed to upload avatar" });
     }
   });
 
@@ -592,6 +612,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting event photo:", error);
       res.status(500).json({ error: "Failed to delete photo" });
+    }
+  });
+
+  // Delete an event (picker or club owner only)
+  app.delete("/api/events/:id", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.status(501).json({ error: "Event deletes not available in mock mode" });
+    }
+
+    try {
+      const eventId = req.params.id;
+      const event = await storage.getEventById(eventId);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      // Must be a member of the club
+      const clubs = await storage.getUserClubs(req.user!.id);
+      const isInClub = clubs.some(c => c.id === event.clubId);
+      if (!isInClub) {
+        return res.status(403).json({ error: "You must be a member of the club to delete events" });
+      }
+
+      // Picker or club owner can delete
+      const isPicker = req.user!.id === event.pickerId;
+      const members = await storage.getClubMembers(event.clubId);
+      const isOwner = members.some(m => m.id === req.user!.id && m.role === "owner");
+      if (!isPicker && !isOwner) {
+        return res.status(403).json({ error: "You must be the picker or an owner to delete this event" });
+      }
+
+      await storage.deleteEvent(event.id);
+      res.json({ message: "Event deleted" });
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      res.status(500).json({ error: "Failed to delete event" });
     }
   });
 

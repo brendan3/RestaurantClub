@@ -504,6 +504,21 @@ export async function deleteEventPhoto(eventId: string, photoId: string): Promis
   });
 }
 
+export async function uploadUserAvatar(file: File): Promise<string> {
+  const dataUrl = await fileToDataUrl(file);
+  const res = await apiRequest<{ imageUrl: string }>("/api/user/me/avatar-upload", {
+    method: "POST",
+    body: JSON.stringify({ dataUrl }),
+  });
+  return res.imageUrl;
+}
+
+export async function deleteEvent(eventId: string): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>(`/api/events/${eventId}`, {
+    method: "DELETE",
+  });
+}
+
 export interface NearbyRestaurantsResponse {
   places: NearbyPlace[];
 }

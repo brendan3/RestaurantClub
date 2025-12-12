@@ -35,4 +35,19 @@ export async function uploadEventImage(eventId: string, dataUrl: string) {
   return result.secure_url;
 }
 
+export async function uploadUserAvatar(userId: string, dataUrl: string): Promise<string> {
+  if (!isCloudinaryConfigured()) {
+    throw new Error("Cloudinary not configured");
+  }
+
+  const folder = CLOUDINARY_UPLOAD_FOLDER || "restaurantclub";
+  const result = await cloudinary.uploader.upload(dataUrl, {
+    public_id: `${folder}/avatars/${userId}`,
+    overwrite: true,
+    resource_type: "image",
+  });
+
+  return result.secure_url;
+}
+
 

@@ -110,6 +110,14 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async deleteEvent(id: string): Promise<void> {
+    // Be explicit about cleanup in case FK cascades aren't present in the DB yet
+    await db.delete(eventAttendees).where(eq(eventAttendees.eventId, id));
+    await db.delete(eventPhotos).where(eq(eventPhotos.eventId, id));
+    await db.delete(eventTags).where(eq(eventTags.eventId, id));
+    await db.delete(events).where(eq(events.id, id));
+  }
+
   async updateEvent(id: string, updates: {
     restaurantName?: string;
     cuisine?: string;
