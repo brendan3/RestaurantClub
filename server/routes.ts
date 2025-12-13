@@ -3,12 +3,46 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { mockEvents, mockUser, mockClubs } from "./mockData";
 import * as auth from "./auth";
-import { generateJoinCode } from "@shared/schema";
+import { generateJoinCode, datePollOptions, datePolls, datePollVotes } from "@shared/schema";
 import { isCloudinaryConfigured, uploadEventImage, uploadUserAvatar } from "./cloudinary";
+import { db } from "./db";
+import { and, asc, desc, eq, gt, sql } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const useMockData = !process.env.DATABASE_URL;
   
+  const buildDatePollOptionsSummary = async (pollId: string, userId: string) => {
+    const rows = await db
+      .select({
+        id: datePollOptions.id,
+        optionDate: datePollOptions.optionDate,
+        order: datePollOptions.order,
+        yesCount: sql<number>`coalesce(sum(case when ${datePollVotes.canAttend} then 1 else 0 end), 0)`,
+        totalVotes: sql<number>`count(${datePollVotes.id})`,
+        currentUserCanAttend: sql<boolean>`coalesce(bool_or(${datePollVotes.userId} = ${userId} and ${datePollVotes.canAttend}), false)`,
+      })
+      .from(datePollOptions)
+      .leftJoin(
+        datePollVotes,
+        and(eq(datePollVotes.optionId, datePollOptions.id), eq(datePollVotes.pollId, pollId))
+      )
+      .where(eq(datePollOptions.pollId, pollId))
+      .groupBy(datePollOptions.id, datePollOptions.optionDate, datePollOptions.order)
+      .orderBy(
+        sql`coalesce(${datePollOptions.order}, 2147483647)`,
+        asc(datePollOptions.optionDate),
+        asc(datePollOptions.id),
+      );
+
+    return rows.map((r) => ({
+      id: r.id,
+      optionDate: r.optionDate.toISOString(),
+      yesCount: Number(r.yesCount ?? 0),
+      totalVotes: Number(r.totalVotes ?? 0),
+      currentUserCanAttend: Boolean(r.currentUserCanAttend),
+    }));
+  };
+
   // Health check endpoint
   app.get("/api/health", (_req, res) => {
     res.json({ 
@@ -277,6 +311,210 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating club:", error);
       res.status(500).json({ error: "Failed to update club" });
+    }
+  });
+
+  // ============================================
+  // DATE POLL ENDPOINTS
+  // ============================================
+
+  // Create a date poll (chooser only: any club member can start a poll and become the chooser)
+  app.post("/api/clubs/:clubId/date-polls", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.status(501).json({ error: "Date polls not available in mock mode" });
+    }
+
+    try {
+      const clubId = req.params.clubId;
+      const isMember = await storage.isUserInClub(req.user!.id, clubId);
+      if (!isMember) {
+        return res.status(403).json({ error: "You must be a member of this club" });
+      }
+
+      const { title, restaurantName, optionDates } = req.body as {
+        title?: string;
+        restaurantName?: string;
+        optionDates?: string[];
+      };
+
+      if (!Array.isArray(optionDates) || optionDates.length < 3 || optionDates.length > 5) {
+        return res.status(400).json({ error: "optionDates must have between 3 and 5 entries" });
+      }
+
+      const parsedDates = optionDates
+        .map((d) => new Date(d))
+        .filter((d) => !Number.isNaN(d.getTime()));
+
+      if (parsedDates.length < 3 || parsedDates.length > 5) {
+        return res.status(400).json({ error: "All optionDates must be valid date strings" });
+      }
+
+      // Ensure no other ACTIVE poll (open + not expired)
+      const activeExisting = await db
+        .select()
+        .from(datePolls)
+        .where(and(eq(datePolls.clubId, clubId), eq(datePolls.status, "open"), gt(datePolls.closesAt, new Date())))
+        .limit(1);
+
+      if (activeExisting.length > 0) {
+        return res.status(400).json({ error: "There is already an active date poll for this club" });
+      }
+
+      const closesAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      const pollTitle = title?.trim() || "Dinner date poll";
+      const pollRestaurant = restaurantName?.trim() || null;
+
+      const created = await storage.createDatePoll({
+        clubId,
+        createdById: req.user!.id,
+        title: pollTitle,
+        restaurantName: pollRestaurant,
+        optionDates: parsedDates,
+        closesAt,
+      });
+
+      const optionsSummary = await buildDatePollOptionsSummary(created.poll.id, req.user!.id);
+      res.json({
+        poll: created.poll,
+        options: optionsSummary,
+        isExpired: false,
+      });
+    } catch (err) {
+      console.error("Error creating date poll:", err);
+      res.status(500).json({ error: "Failed to create date poll" });
+    }
+  });
+
+  // Get active poll for a club (open; may be expired if closesAt is in the past)
+  app.get("/api/clubs/:clubId/date-polls/active", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.json(null);
+    }
+
+    try {
+      const clubId = req.params.clubId;
+      const isMember = await storage.isUserInClub(req.user!.id, clubId);
+      if (!isMember) {
+        return res.status(403).json({ error: "You must be a member of this club" });
+      }
+
+      // Only return open polls. If none exist, return null.
+      const pollRes = await db
+        .select()
+        .from(datePolls)
+        .where(and(eq(datePolls.clubId, clubId), eq(datePolls.status, "open")))
+        .orderBy(desc(datePolls.createdAt), desc(datePolls.id))
+        .limit(1);
+
+      const poll = pollRes[0];
+      if (!poll) return res.json(null);
+
+      const isExpired = new Date() > poll.closesAt;
+      const optionsSummary = await buildDatePollOptionsSummary(poll.id, req.user!.id);
+
+      res.json({
+        poll,
+        options: optionsSummary,
+        isExpired,
+      });
+    } catch (err) {
+      console.error("Error fetching active date poll:", err);
+      res.status(500).json({ error: "Failed to fetch date poll" });
+    }
+  });
+
+  // Submit votes for a poll
+  app.post("/api/date-polls/:pollId/vote", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.status(501).json({ error: "Date polls not available in mock mode" });
+    }
+
+    try {
+      const pollId = req.params.pollId;
+      const { optionIds } = req.body as { optionIds?: string[] };
+
+      if (!Array.isArray(optionIds)) {
+        return res.status(400).json({ error: "optionIds must be an array" });
+      }
+
+      const poll = await storage.getDatePollById(pollId);
+      if (!poll) {
+        return res.status(404).json({ error: "Poll not found" });
+      }
+
+      const isMember = await storage.isUserInClub(req.user!.id, poll.clubId);
+      if (!isMember) {
+        return res.status(403).json({ error: "You must be a member of this club" });
+      }
+
+      if (poll.status !== "open" || new Date() > poll.closesAt) {
+        return res.status(400).json({ error: "Poll closed" });
+      }
+
+      const options = await storage.getDatePollOptions(pollId);
+      const validOptionIds = new Set(options.map((o) => o.id));
+      const filtered = optionIds.filter((id) => typeof id === "string" && validOptionIds.has(id));
+
+      await storage.saveDatePollVotes(pollId, req.user!.id, filtered);
+      res.json({ message: "Votes saved" });
+    } catch (err) {
+      console.error("Error saving date poll votes:", err);
+      res.status(500).json({ error: "Failed to save votes" });
+    }
+  });
+
+  // Close poll & compute winner (chooser or club owner)
+  app.post("/api/date-polls/:pollId/close", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.status(501).json({ error: "Date polls not available in mock mode" });
+    }
+
+    try {
+      const pollId = req.params.pollId;
+      const poll = await storage.getDatePollById(pollId);
+      if (!poll) {
+        return res.status(404).json({ error: "Poll not found" });
+      }
+
+      const isMember = await storage.isUserInClub(req.user!.id, poll.clubId);
+      if (!isMember) {
+        return res.status(403).json({ error: "You must be a member of this club" });
+      }
+
+      const members = await storage.getClubMembers(poll.clubId);
+      const isOwner = members.some((m) => m.id === req.user!.id && m.role === "owner");
+      const isCreator = poll.createdById === req.user!.id;
+      if (!isOwner && !isCreator) {
+        return res.status(403).json({ error: "Only the poll creator or a club owner can close the poll" });
+      }
+
+      const closed = await storage.closeDatePoll(pollId, req.user!.id);
+      const optionsSummary = await buildDatePollOptionsSummary(pollId, req.user!.id);
+
+      let winningOptionId: string | null = null;
+      if (optionsSummary.length > 0) {
+        const maxYes = Math.max(...optionsSummary.map((o) => o.yesCount));
+        if (maxYes > 0) {
+          const tied = optionsSummary
+            .filter((o) => o.yesCount === maxYes)
+            .sort((a, b) => new Date(a.optionDate).getTime() - new Date(b.optionDate).getTime());
+          winningOptionId = tied[0]?.id ?? null;
+        }
+      }
+
+      res.json({
+        poll: closed.poll,
+        options: optionsSummary,
+        isExpired: true,
+        winningOptionId,
+      });
+    } catch (err: any) {
+      console.error("Error closing date poll:", err);
+      const msg = typeof err?.message === "string" ? err.message : "Failed to close poll";
+      if (msg.includes("Not authorized")) {
+        return res.status(403).json({ error: msg });
+      }
+      res.status(500).json({ error: "Failed to close poll" });
     }
   });
 

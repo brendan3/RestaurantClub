@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CalendarIcon, MapPin, UtensilsCrossed, Clock, Users, FileText, Navigation, Search, Star, Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createEvent, searchNearbyRestaurants, searchRestaurants, getRestaurantPhotoUrl, type NearbyPlace } from "@/lib/api";
 import { toast } from "sonner";
+import type { AddEventDefaults } from "@/lib/event-modal-context";
 
 /**
  * Geolocation helper that always settles (resolves or rejects) within timeoutMs.
@@ -75,9 +76,10 @@ interface AddEventModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onEventCreated?: () => void;
+  defaultValues?: AddEventDefaults;
 }
 
-export default function AddEventModal({ open, onOpenChange, onEventCreated }: AddEventModalProps) {
+export default function AddEventModal({ open, onOpenChange, onEventCreated, defaultValues }: AddEventModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     restaurantName: "",
@@ -98,6 +100,20 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated }: Ad
   
   // Selected Google Place info (for photo persistence)
   const [selectedPlace, setSelectedPlace] = useState<{ placeId: string; photoName?: string } | null>(null);
+
+  useEffect(() => {
+    if (!open || !defaultValues) return;
+    setFormData((prev) => ({
+      ...prev,
+      restaurantName: defaultValues.restaurantName ?? prev.restaurantName,
+      date: defaultValues.date ?? prev.date,
+      time: defaultValues.time ?? prev.time,
+    }));
+    // Defaults represent a manual entry; don't pin to a Google Place
+    if (defaultValues.restaurantName) {
+      setSelectedPlace(null);
+    }
+  }, [open, defaultValues?.restaurantName, defaultValues?.date, defaultValues?.time]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

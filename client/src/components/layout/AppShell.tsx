@@ -1,18 +1,39 @@
 import { Link, useLocation } from "wouter";
-import { useState, useEffect } from "react";
-import { Home, Map, Users, User, MessageCircle, Plus, Camera } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { Calendar, Camera, ChevronLeft, Home, Map, MessageCircle, Plus, Upload, User, Users } from "lucide-react";
 import { ASSETS } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useEventModal } from "@/lib/event-modal-context";
-import { getUpcomingEvents, type Event } from "@/lib/api";
+import { getPastEvents, getUpcomingEvents, uploadEventPhoto, type Event } from "@/lib/api";
 import AddEventModal from "@/components/AddEventModal";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { ToastAction } from "@/components/ui/toast";
 
-export default function AppShell({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
+export default function AppShell({ children }: { children: ReactNode }) {
+  const [location, navigate] = useLocation();
   const { toast } = useToast();
-  const { isAddEventOpen, setIsAddEventOpen, onEventCreated } = useEventModal();
+  const { isAddEventOpen, setIsAddEventOpen, addEventDefaults, setAddEventDefaults, onEventCreated } = useEventModal();
   const [nextEvent, setNextEvent] = useState<Event | null>(null);
+
+  // Mobile "Add Photos" flow state (camera button)
+  const [isPhotoFlowOpen, setIsPhotoFlowOpen] = useState(false);
+  const [photoFlowStep, setPhotoFlowStep] = useState<"photos" | "event" | "done">("photos");
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isLoadingEvents, setIsLoadingEvents] = useState(false);
+  const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
+  const [pastEvents, setPastEvents] = useState<Event[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch next upcoming event for the sidebar
   useEffect(() => {
@@ -34,6 +55,126 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       title: "Coming Soon! 🚀",
       description: `${feature} will be available in the next update.`,
     });
+  };
+
+  const cleanupPreviews = (urls: string[]) => {
+    urls.forEach((u) => {
+      try {
+        URL.revokeObjectURL(u);
+      } catch {
+        // ignore
+      }
+    });
+  };
+
+  const resetPhotoFlow = () => {
+    setPhotoFlowStep("photos");
+    setSelectedEventId(null);
+    setSelectedFiles([]);
+    cleanupPreviews(previews);
+    setPreviews([]);
+    setIsUploading(false);
+    setIsLoadingEvents(false);
+    setUpcomingEvents([]);
+    setPastEvents([]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const openPhotoFlow = () => {
+    resetPhotoFlow();
+    setIsPhotoFlowOpen(true);
+  };
+
+  const handlePickPhotos = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFilesSelected = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const fileArray = Array.from(files)
+      .filter((f) => f.type.startsWith("image/"))
+      .slice(0, 4);
+
+    cleanupPreviews(previews);
+    setSelectedFiles(fileArray);
+    setPreviews(fileArray.map((f) => URL.createObjectURL(f)));
+  };
+
+  const selectedEvent = useMemo(() => {
+    if (!selectedEventId) return null;
+    return (
+      upcomingEvents.find((e) => e.id === selectedEventId) ||
+      pastEvents.find((e) => e.id === selectedEventId) ||
+      null
+    );
+  }, [selectedEventId, upcomingEvents, pastEvents]);
+
+  const loadEventsForPicker = async () => {
+    setIsLoadingEvents(true);
+    try {
+      const [upcoming, past] = await Promise.all([getUpcomingEvents(), getPastEvents()]);
+      setUpcomingEvents(upcoming);
+      setPastEvents(past);
+    } catch (err) {
+      console.error("Failed to load events for picker", err);
+      toast({
+        title: "Couldn't load your dinners",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingEvents(false);
+    }
+  };
+
+  const goToEventStep = async () => {
+    setPhotoFlowStep("event");
+    setSelectedEventId(null);
+    await loadEventsForPicker();
+  };
+
+  const handleUploadToEvent = async () => {
+    if (!selectedEventId || selectedFiles.length === 0) return;
+    setIsUploading(true);
+    try {
+      for (const file of selectedFiles) {
+        await uploadEventPhoto(selectedEventId, file);
+      }
+
+      const restaurantName = selectedEvent?.restaurantName ?? "your event";
+      toast({
+        title: "Photos added",
+        description: `Photos added to ${restaurantName}.`,
+        action: (
+          <ToastAction
+            altText="View event"
+            onClick={() => {
+              setIsPhotoFlowOpen(false);
+              navigate(`/event/${selectedEventId}`);
+            }}
+          >
+            View event
+          </ToastAction>
+        ),
+      });
+
+      setIsPhotoFlowOpen(false);
+      resetPhotoFlow();
+    } catch (err: any) {
+      console.error("Upload failed", err);
+      const msg = err?.message?.includes("not configured")
+        ? "Photo uploads not available right now."
+        : "Couldn't upload photos. Please try again.";
+      toast({
+        title: "Upload failed",
+        description: msg,
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   // Calculate days until event (clamped to 0 minimum)
@@ -185,7 +326,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
             {/* Center Action Button (Floating) */}
             <div className="relative -top-8">
-                <button onClick={() => handleComingSoon("Photo Upload")} className="w-16 h-16 rounded-full bg-primary text-white shadow-lg shadow-primary/30 flex items-center justify-center transform transition-transform active:scale-95 border-4 border-background">
+                <button
+                  onClick={openPhotoFlow}
+                  className="w-16 h-16 rounded-full bg-primary text-white shadow-lg shadow-primary/30 flex items-center justify-center transform transition-transform active:scale-95 border-4 border-background"
+                >
                     <Camera className="w-7 h-7" />
                 </button>
             </div>
@@ -204,10 +348,216 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
 
+      {/* Mobile Photo Upload Flow */}
+      <Sheet
+        open={isPhotoFlowOpen}
+        onOpenChange={(open) => {
+          setIsPhotoFlowOpen(open);
+          if (!open) resetPhotoFlow();
+        }}
+      >
+        <SheetContent side="bottom" className="rounded-t-[2rem] px-5 pb-6">
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            capture="environment"
+            className="hidden"
+            onChange={handleFilesSelected}
+          />
+
+          {photoFlowStep === "photos" && (
+            <>
+              <SheetHeader className="text-left">
+                <SheetTitle className="font-heading">Add dinner photos</SheetTitle>
+                <SheetDescription>
+                  Take or choose a few photos, then pick which event they’re for.
+                </SheetDescription>
+              </SheetHeader>
+
+              <div className="mt-4 space-y-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full rounded-2xl"
+                  onClick={handlePickPhotos}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Take / choose photos
+                </Button>
+
+                {previews.length > 0 && (
+                  <div className="grid grid-cols-4 gap-2">
+                    {previews.map((src, idx) => (
+                      <div
+                        key={src}
+                        className="relative aspect-square overflow-hidden rounded-xl bg-muted border border-border/50"
+                        aria-label={`Selected photo ${idx + 1}`}
+                      >
+                        <img src={src} alt={`Selected ${idx + 1}`} className="h-full w-full object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="text-xs text-muted-foreground">
+                  {selectedFiles.length > 0 ? `${selectedFiles.length} selected (max 4)` : "Select 1–4 photos"}
+                </div>
+              </div>
+
+              <SheetFooter className="mt-6">
+                <Button
+                  type="button"
+                  className="w-full rounded-2xl"
+                  disabled={selectedFiles.length === 0}
+                  onClick={goToEventStep}
+                >
+                  Next
+                </Button>
+              </SheetFooter>
+            </>
+          )}
+
+          {photoFlowStep === "event" && (
+            <>
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => setPhotoFlowStep("photos")}
+                  disabled={isUploading}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Back
+                </button>
+                <div className="text-center">
+                  <div className="font-heading font-semibold">Pick an event</div>
+                  <div className="text-xs text-muted-foreground">Where should these photos go?</div>
+                </div>
+                <div className="w-9" aria-hidden="true" />
+              </div>
+
+              <div className="mt-4 max-h-[55vh] overflow-y-auto pr-1 space-y-6">
+                {isLoadingEvents ? (
+                  <div className="py-10 text-center text-sm text-muted-foreground">
+                    Loading your dinners…
+                  </div>
+                ) : upcomingEvents.length === 0 && pastEvents.length === 0 ? (
+                  <div className="py-10 text-center">
+                    <div className="font-medium">No dinners yet</div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      Create an event first, then come back to add photos.
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {upcomingEvents.length > 0 && (
+                      <div>
+                        <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                          Upcoming dinners
+                        </div>
+                        <div className="space-y-2">
+                          {upcomingEvents.map((evt) => {
+                            const isSelected = selectedEventId === evt.id;
+                            return (
+                              <button
+                                key={evt.id}
+                                type="button"
+                                onClick={() => setSelectedEventId(evt.id)}
+                                className={`w-full text-left rounded-2xl border px-4 py-3 transition-colors ${
+                                  isSelected
+                                    ? "border-primary bg-primary/5"
+                                    : "border-border/50 hover:bg-muted"
+                                }`}
+                              >
+                                <div className="font-semibold text-foreground">{evt.restaurantName}</div>
+                                <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                                  <Calendar className="w-3.5 h-3.5" />
+                                  {new Date(evt.eventDate).toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
+                                  })}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {pastEvents.length > 0 && (
+                      <div>
+                        <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                          Past dinners
+                        </div>
+                        <div className="space-y-2">
+                          {pastEvents.map((evt) => {
+                            const isSelected = selectedEventId === evt.id;
+                            return (
+                              <button
+                                key={evt.id}
+                                type="button"
+                                onClick={() => setSelectedEventId(evt.id)}
+                                className={`w-full text-left rounded-2xl border px-4 py-3 transition-colors ${
+                                  isSelected
+                                    ? "border-primary bg-primary/5"
+                                    : "border-border/50 hover:bg-muted"
+                                }`}
+                              >
+                                <div className="font-semibold text-foreground">{evt.restaurantName}</div>
+                                <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                                  <Calendar className="w-3.5 h-3.5" />
+                                  {new Date(evt.eventDate).toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
+                                  })}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1 rounded-2xl"
+                  onClick={loadEventsForPicker}
+                  disabled={isLoadingEvents || isUploading}
+                >
+                  Refresh
+                </Button>
+                <Button
+                  type="button"
+                  className="flex-[2] rounded-2xl"
+                  disabled={!selectedEventId || isUploading || selectedFiles.length === 0}
+                  onClick={handleUploadToEvent}
+                >
+                  {isUploading ? "Uploading..." : "Upload to this event"}
+                </Button>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
+
       {/* Global Add Event Modal */}
       <AddEventModal
         open={isAddEventOpen}
-        onOpenChange={setIsAddEventOpen}
+        defaultValues={addEventDefaults ?? undefined}
+        onOpenChange={(open) => {
+          setIsAddEventOpen(open);
+          if (!open) setAddEventDefaults(null);
+        }}
         onEventCreated={onEventCreated}
       />
     </div>

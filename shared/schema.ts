@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean } from "drizzle-orm/pg-core";
+import { pgEnum, pgTable, text, varchar, timestamp, integer, boolean, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -106,6 +106,44 @@ export const wishlistRestaurants = pgTable("wishlist_restaurants", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// ============================================
+// DATE POLLS (LIGHTWEIGHT PLANNING)
+// ============================================
+
+export const datePollStatusEnum = pgEnum("date_poll_status", ["open", "closed"]);
+
+export const datePolls = pgTable("date_polls", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clubId: varchar("club_id").notNull().references(() => clubs.id, { onDelete: "cascade" }),
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  restaurantName: text("restaurant_name"),
+  status: datePollStatusEnum("status").notNull().default("open"),
+  closesAt: timestamp("closes_at", { withTimezone: true }).notNull().default(sql`now() + interval '24 hours'`),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const datePollOptions = pgTable("date_poll_options", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  pollId: varchar("poll_id").notNull().references(() => datePolls.id, { onDelete: "cascade" }),
+  optionDate: timestamp("option_date", { withTimezone: true }).notNull(),
+  order: integer("order"),
+});
+
+export const datePollVotes = pgTable(
+  "date_poll_votes",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    pollId: varchar("poll_id").notNull().references(() => datePolls.id, { onDelete: "cascade" }),
+    userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    optionId: varchar("option_id").notNull().references(() => datePollOptions.id, { onDelete: "cascade" }),
+    canAttend: boolean("can_attend").notNull().default(true),
+  },
+  (t) => ({
+    uniq: uniqueIndex("date_poll_votes_unique").on(t.pollId, t.userId, t.optionId),
+  })
+);
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   email: true,
@@ -151,6 +189,15 @@ export type EventPhoto = typeof eventPhotos.$inferSelect;
 export type InsertEventPhoto = typeof eventPhotos.$inferInsert;
 
 export type WishlistRestaurant = typeof wishlistRestaurants.$inferSelect;
+
+export type DatePoll = typeof datePolls.$inferSelect;
+export type DatePollOption = typeof datePollOptions.$inferSelect;
+export type DatePollVote = typeof datePollVotes.$inferSelect;
+
+export type DatePollWithOptions = {
+  poll: DatePoll;
+  options: DatePollOption[];
+};
 
 export type SignupInput = z.infer<typeof signupSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

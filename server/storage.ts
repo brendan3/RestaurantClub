@@ -1,4 +1,14 @@
-import { type User, type InsertUser, type Event, type Club, type WishlistRestaurant, type EventPhoto } from "@shared/schema";
+import {
+  type User,
+  type InsertUser,
+  type Event,
+  type Club,
+  type WishlistRestaurant,
+  type EventPhoto,
+  type DatePoll,
+  type DatePollOption,
+  type DatePollWithOptions,
+} from "@shared/schema";
 import { randomUUID } from "crypto";
 
 // Storage interface for all CRUD operations
@@ -83,6 +93,21 @@ export interface IStorage {
     order?: number | null;
   }): Promise<EventPhoto>;
   deleteEventPhoto(photoId: string, userId: string): Promise<void>;
+
+  // Date poll methods
+  getActiveDatePollByClub(clubId: string, userId: string): Promise<DatePollWithOptions | null>;
+  createDatePoll(input: {
+    clubId: string;
+    createdById: string;
+    title: string;
+    restaurantName?: string | null;
+    optionDates: Date[]; // 3–5 choices
+    closesAt: Date;
+  }): Promise<DatePollWithOptions>;
+  saveDatePollVotes(pollId: string, userId: string, optionIds: string[]): Promise<void>;
+  closeDatePoll(pollId: string, userId: string): Promise<DatePollWithOptions>;
+  getDatePollById(pollId: string): Promise<DatePoll | undefined>;
+  getDatePollOptions(pollId: string): Promise<DatePollOption[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -295,6 +320,31 @@ export class MemStorage implements IStorage {
 
   async deleteEventPhoto(): Promise<void> {
     throw new Error("Not implemented in MemStorage");
+  }
+
+  // Date poll methods
+  async getActiveDatePollByClub(): Promise<DatePollWithOptions | null> {
+    throw new Error("Not implemented");
+  }
+
+  async createDatePoll(): Promise<DatePollWithOptions> {
+    throw new Error("Not implemented");
+  }
+
+  async saveDatePollVotes(): Promise<void> {
+    throw new Error("Not implemented");
+  }
+
+  async closeDatePoll(): Promise<DatePollWithOptions> {
+    throw new Error("Not implemented");
+  }
+
+  async getDatePollById(): Promise<DatePoll | undefined> {
+    return undefined;
+  }
+
+  async getDatePollOptions(): Promise<DatePollOption[]> {
+    return [];
   }
 }
 

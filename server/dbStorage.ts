@@ -2,7 +2,9 @@ import { eq, desc, asc, and, gte, lt, sql } from "drizzle-orm";
 import { db } from "./db"; // <-- FIX 1: Import 'db' directly (not getDb)
 import { 
   users, events, clubs, clubMembers, eventAttendees, eventTags, wishlistRestaurants, eventPhotos,
-  type User, type InsertUser, type Event, type Club, type WishlistRestaurant, type EventPhoto
+  datePolls, datePollOptions, datePollVotes,
+  type User, type InsertUser, type Event, type Club, type WishlistRestaurant, type EventPhoto,
+  type DatePoll, type DatePollOption, type DatePollWithOptions,
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -424,7 +426,120 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async deleteEventPhoto(photoId: string): Promise<void> {
+  async deleteEventPhoto(photoId: string, _userId?: string): Promise<void> {
     await db.delete(eventPhotos).where(eq(eventPhotos.id, photoId));
+  }
+
+  // ============================================
+  // DATE POLL METHODS
+  // ============================================
+
+  async getActiveDatePollByClub(clubId: string, _userId: string): Promise<DatePollWithOptions | null> {
+    const pollRes = await db
+      .select()
+      .from(datePolls)
+      .where(and(eq(datePolls.clubId, clubId), eq(datePolls.status, "open")))
+      .orderBy(desc(datePolls.createdAt), desc(datePolls.id))
+      .limit(1);
+
+    const poll = pollRes[0];
+    if (!poll) return null;
+
+    const options = await this.getDatePollOptions(poll.id);
+    return { poll, options };
+  }
+
+  async createDatePoll(input: {
+    clubId: string;
+    createdById: string;
+    title: string;
+    restaurantName?: string | null;
+    optionDates: Date[];
+    closesAt: Date;
+  }): Promise<DatePollWithOptions> {
+    return await db.transaction(async (tx) => {
+      const pollRes = await tx
+        .insert(datePolls)
+        .values({
+          clubId: input.clubId,
+          createdById: input.createdById,
+          title: input.title,
+          restaurantName: input.restaurantName ?? null,
+          status: "open",
+          closesAt: input.closesAt,
+        })
+        .returning();
+
+      const poll = pollRes[0] as DatePoll;
+
+      const optionRows = input.optionDates.map((d, idx) => ({
+        pollId: poll.id,
+        optionDate: d,
+        order: idx,
+      }));
+
+      const options = await tx.insert(datePollOptions).values(optionRows).returning();
+      return { poll, options };
+    });
+  }
+
+  async saveDatePollVotes(pollId: string, userId: string, optionIds: string[]): Promise<void> {
+    await db.delete(datePollVotes).where(and(eq(datePollVotes.pollId, pollId), eq(datePollVotes.userId, userId)));
+
+    if (optionIds.length === 0) return;
+
+    const rows = optionIds.map((optionId) => ({
+      pollId,
+      userId,
+      optionId,
+      canAttend: true,
+    }));
+
+    await db.insert(datePollVotes).values(rows);
+  }
+
+  async closeDatePoll(pollId: string, userId: string): Promise<DatePollWithOptions> {
+    const poll = await this.getDatePollById(pollId);
+    if (!poll) throw new Error("Poll not found");
+
+    const isCreator = poll.createdById === userId;
+    if (!isCreator) {
+      const ownerRes = await db
+        .select()
+        .from(clubMembers)
+        .where(and(eq(clubMembers.clubId, poll.clubId), eq(clubMembers.userId, userId), eq(clubMembers.role, "owner")))
+        .limit(1);
+
+      if (ownerRes.length === 0) {
+        throw new Error("Not authorized to close poll");
+      }
+    }
+
+    const updatedRes = await db
+      .update(datePolls)
+      .set({ status: "closed" })
+      .where(eq(datePolls.id, pollId))
+      .returning();
+
+    const updated = updatedRes[0] as DatePoll;
+    const options = await this.getDatePollOptions(pollId);
+    return { poll: updated, options };
+  }
+
+  async getDatePollById(pollId: string): Promise<DatePoll | undefined> {
+    const res = await db.select().from(datePolls).where(eq(datePolls.id, pollId)).limit(1);
+    return res[0];
+  }
+
+  async getDatePollOptions(pollId: string): Promise<DatePollOption[]> {
+    return await db
+      .select()
+      .from(datePollOptions)
+      .where(eq(datePollOptions.pollId, pollId))
+      .orderBy(
+        sql`coalesce(${datePollOptions.order}, 2147483647)`,
+        asc(datePollOptions.optionDate),
+        asc(datePollOptions.id),
+      );
   }
 }

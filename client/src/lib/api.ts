@@ -54,6 +54,33 @@ export interface EventPhoto {
   createdAt?: string;
 }
 
+// ============================================
+// DATE POLL TYPES
+// ============================================
+
+export interface DatePollOptionSummary {
+  id: string;
+  optionDate: string;
+  yesCount: number;
+  totalVotes: number;
+  currentUserCanAttend: boolean;
+}
+
+export interface ActiveDatePollResponse {
+  poll: {
+    id: string;
+    clubId: string;
+    createdById: string;
+    title: string;
+    restaurantName?: string | null;
+    closesAt: string;
+    status: "open" | "closed";
+  };
+  options: DatePollOptionSummary[];
+  isExpired: boolean;
+  winningOptionId?: string | null;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -511,6 +538,45 @@ export async function uploadUserAvatar(file: File): Promise<string> {
     body: JSON.stringify({ dataUrl }),
   });
   return res.imageUrl;
+}
+
+export async function createDatePoll(
+  clubId: string,
+  payload: {
+    title?: string;
+    restaurantName?: string;
+    optionDates: string[];
+  }
+): Promise<ActiveDatePollResponse> {
+  return apiRequest<ActiveDatePollResponse>(`/api/clubs/${clubId}/date-polls`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getActiveDatePoll(clubId: string): Promise<ActiveDatePollResponse | null> {
+  return apiRequest<ActiveDatePollResponse | null>(`/api/clubs/${clubId}/date-polls/active`);
+}
+
+export async function voteOnDatePoll(pollId: string, optionIds: string[]): Promise<void> {
+  await apiRequest<{ message: string }>(`/api/date-polls/${pollId}/vote`, {
+    method: "POST",
+    body: JSON.stringify({ optionIds }),
+  });
+}
+
+export async function closeDatePoll(pollId: string): Promise<{
+  winningOptionId: string | null;
+  options: DatePollOptionSummary[];
+}> {
+  const res = await apiRequest<ActiveDatePollResponse>(`/api/date-polls/${pollId}/close`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+  return {
+    winningOptionId: res.winningOptionId ?? null,
+    options: res.options,
+  };
 }
 
 export async function deleteEvent(eventId: string): Promise<{ message: string }> {

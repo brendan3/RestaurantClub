@@ -1,8 +1,16 @@
 import { createContext, useContext, useState, useRef, useCallback, ReactNode } from "react";
 
+export type AddEventDefaults = {
+  restaurantName?: string;
+  date?: string; // YYYY-MM-DD (local)
+  time?: string; // HH:mm (local)
+};
+
 interface EventModalContextType {
   isAddEventOpen: boolean;
   setIsAddEventOpen: (open: boolean) => void;
+  addEventDefaults: AddEventDefaults | null;
+  setAddEventDefaults: (defaults: AddEventDefaults | null) => void;
   isInviteOpen: boolean;
   setIsInviteOpen: (open: boolean) => void;
   // Callback that gets called when an event is created
@@ -14,6 +22,7 @@ const EventModalContext = createContext<EventModalContextType | undefined>(undef
 
 export function EventModalProvider({ children }: { children: ReactNode }) {
   const [isAddEventOpen, setIsAddEventOpen] = useState(false);
+  const [addEventDefaults, setAddEventDefaults] = useState<AddEventDefaults | null>(null);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const onEventCreatedRef = useRef<(() => void) | null>(null);
 
@@ -29,6 +38,8 @@ export function EventModalProvider({ children }: { children: ReactNode }) {
     <EventModalContext.Provider value={{ 
       isAddEventOpen, 
       setIsAddEventOpen,
+      addEventDefaults,
+      setAddEventDefaults,
       isInviteOpen,
       setIsInviteOpen,
       onEventCreated,
