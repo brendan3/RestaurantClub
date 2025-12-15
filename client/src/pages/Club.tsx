@@ -320,7 +320,7 @@ Sign up at the app and enter the code to join!`;
       <div className="text-center max-w-2xl mx-auto space-y-4">
         <img src={ASSETS.mascot} alt="Mascot" className="w-24 h-24 mx-auto object-contain animate-bounce-slow" />
         <div className="flex items-center justify-center gap-2 flex-wrap">
-        <h1 className="text-3xl md:text-4xl font-heading font-bold text-foreground">{club.name}</h1>
+          <h1 className="text-3xl md:text-4xl font-heading font-bold text-foreground">{club.name}</h1>
           {isOwner && (
             <Button
               size="sm"
