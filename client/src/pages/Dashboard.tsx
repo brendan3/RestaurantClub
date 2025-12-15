@@ -413,15 +413,48 @@ Sign up at the app and enter the code to join!`;
         </div>
       ) : (
         <div className="relative overflow-hidden rounded-[2.5rem] bg-muted shadow-float p-10 text-center">
-          <h3 className="text-2xl font-heading font-bold mb-2">No Upcoming Dinners</h3>
-          <p className="text-muted-foreground mb-4">Time to plan your next culinary adventure!</p>
-          <Button 
-            className="rounded-full font-bold"
-            onClick={() => setIsAddEventOpen(true)}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Create Event
-          </Button>
+          <h3 className="text-2xl font-heading font-bold mb-2">
+            {currentClub ? "No Upcoming Dinners" : "Welcome to Restaurant Club!"}
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            {currentClub ? "Time to plan your next culinary adventure!" : "Start by creating your first dinner club."}
+          </p>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
+            {currentClub ? (
+              <>
+                <Button
+                  className="rounded-full font-bold"
+                  onClick={() => setIsAddEventOpen(true)}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Event
+                </Button>
+                <Button
+                  asChild
+                  variant="outline"
+                  className="rounded-full font-bold bg-white shadow-sm border border-white/50 text-foreground hover:bg-primary/10 hover:text-primary transition-all"
+                >
+                  <Link href="/join">Join with Code</Link>
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  asChild
+                  className="rounded-full font-bold"
+                >
+                  <Link href="/create-club">Create Your Club</Link>
+                </Button>
+                <Button
+                  asChild
+                  variant="outline"
+                  className="rounded-full font-bold bg-white shadow-sm border border-white/50 text-foreground hover:bg-primary/10 hover:text-primary transition-all"
+                >
+                  <Link href="/join">Join with Code</Link>
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       )}
 

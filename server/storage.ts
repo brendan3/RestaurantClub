@@ -58,6 +58,7 @@ export interface IStorage {
   createClub(club: any): Promise<Club>;
   updateClubJoinCode(clubId: string, joinCode: string): Promise<void>;
   updateClub(clubId: string, updates: { name?: string; type?: string }): Promise<Club>;
+  deleteClub(clubId: string): Promise<void>;
   updateUserProfile(userId: string, data: { name?: string; avatar?: string | null }): Promise<User>;
   addClubMember(clubId: string, userId: string, role?: string): Promise<void>;
   isUserInClub(userId: string, clubId: string): Promise<boolean>;
@@ -243,6 +244,10 @@ export class MemStorage implements IStorage {
     _clubId: string,
     _updates: { name?: string; type?: string }
   ): Promise<Club> {
+    throw new Error("Not implemented");
+  }
+
+  async deleteClub(_clubId: string): Promise<void> {
     throw new Error("Not implemented");
   }
 

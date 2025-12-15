@@ -210,6 +210,10 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async deleteClub(clubId: string): Promise<void> {
+    await db.delete(clubs).where(eq(clubs.id, clubId));
+  }
+
   async addClubMember(clubId: string, userId: string, role: string = "member"): Promise<void> {
     await db.insert(clubMembers).values({
       clubId,

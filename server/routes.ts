@@ -314,6 +314,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete a club (owner only)
+  app.delete("/api/clubs/:id", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.status(501).json({ error: "Club deletion not available in mock mode" });
+    }
+
+    try {
+      const clubId = req.params.id;
+      const club = await storage.getClubById(clubId);
+      if (!club) {
+        return res.status(404).json({ error: "Club not found" });
+      }
+
+      const members = await storage.getClubMembers(clubId);
+      const isOwner = members.some(m => m.id === req.user!.id && m.role === "owner");
+      if (!isOwner) {
+        return res.status(403).json({ error: "Only the club owner can delete the club" });
+      }
+
+      await storage.deleteClub(clubId);
+      res.json({ message: "Club deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting club:", error);
+      res.status(500).json({ error: "Failed to delete club" });
+    }
+  });
+
   // ============================================
   // DATE POLL ENDPOINTS
   // ============================================

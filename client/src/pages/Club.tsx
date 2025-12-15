@@ -27,6 +27,7 @@ import {
   getUserClubs,
   getWishlist,
   updateClub,
+  deleteClub,
 } from "@/lib/api";
 import { toast } from "sonner";
 import { useEventModal } from "@/lib/event-modal-context";
@@ -60,6 +61,8 @@ export default function Club() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [newName, setNewName] = useState("");
   const [isSavingClub, setIsSavingClub] = useState(false);
+  const [isDeleteClubOpen, setIsDeleteClubOpen] = useState(false);
+  const [isDeletingClub, setIsDeletingClub] = useState(false);
   const { setIsAddEventOpen, setAddEventDefaults } = useEventModal();
 
   useEffect(() => {
@@ -295,6 +298,21 @@ Sign up at the app and enter the code to join!`;
       time,
     });
     setIsAddEventOpen(true);
+  };
+
+  const handleDeleteClub = async () => {
+    setIsDeletingClub(true);
+    try {
+      await deleteClub(club.id);
+      toast.success("Club deleted successfully");
+      // Navigate back to dashboard/home
+      window.location.href = "/";
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete club");
+    } finally {
+      setIsDeletingClub(false);
+      setIsDeleteClubOpen(false);
+    }
   };
 
   return (
@@ -590,29 +608,64 @@ Sign up at the app and enter the code to join!`;
                 placeholder="Club name"
               />
             </div>
-            <div className="flex justify-end gap-3 pt-4">
-              <Button variant="ghost" onClick={() => setIsEditingName(false)}>Cancel</Button>
+            <div className="flex justify-between gap-3 pt-4">
               <Button
-                onClick={async () => {
-                  if (!newName.trim()) {
-                    toast.error("Club name cannot be empty");
-                    return;
-                  }
-                  setIsSavingClub(true);
-                  try {
-                    const updated = await updateClub(club.id, { name: newName.trim() });
-                    setClubs([updated, ...clubs.slice(1)]);
-                    toast.success("Club name updated");
-                    setIsEditingName(false);
-                  } catch (error: any) {
-                    toast.error(error.message || "Failed to update club");
-                  } finally {
-                    setIsSavingClub(false);
-                  }
+                variant="destructive"
+                onClick={() => {
+                  setIsEditingName(false);
+                  setIsDeleteClubOpen(true);
                 }}
-                disabled={isSavingClub}
               >
-                {isSavingClub ? "Saving..." : "Save"}
+                Delete Club
+              </Button>
+              <div className="flex gap-3">
+                <Button variant="ghost" onClick={() => setIsEditingName(false)}>Cancel</Button>
+                <Button
+                  onClick={async () => {
+                    if (!newName.trim()) {
+                      toast.error("Club name cannot be empty");
+                      return;
+                    }
+                    setIsSavingClub(true);
+                    try {
+                      const updated = await updateClub(club.id, { name: newName.trim() });
+                      setClubs([updated, ...clubs.slice(1)]);
+                      toast.success("Club name updated");
+                      setIsEditingName(false);
+                    } catch (error: any) {
+                      toast.error(error.message || "Failed to update club");
+                    } finally {
+                      setIsSavingClub(false);
+                    }
+                  }}
+                  disabled={isSavingClub}
+                >
+                  {isSavingClub ? "Saving..." : "Save"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Delete Club Confirmation Modal */}
+      {isOwner && (
+        <Dialog open={isDeleteClubOpen} onOpenChange={setIsDeleteClubOpen}>
+          <DialogContent className="sm:max-w-[420px] rounded-[1.25rem]">
+            <DialogHeader>
+              <DialogTitle>Delete Club</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete "{club.name}"? This action cannot be undone and will permanently remove all events, RSVPs, and data associated with this club.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button variant="ghost" onClick={() => setIsDeleteClubOpen(false)}>Cancel</Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteClub}
+                disabled={isDeletingClub}
+              >
+                {isDeletingClub ? "Deleting..." : "Delete Club"}
               </Button>
             </div>
           </DialogContent>

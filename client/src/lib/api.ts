@@ -338,6 +338,12 @@ export async function updateClub(
   });
 }
 
+export async function deleteClub(clubId: string): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>(`/api/clubs/${clubId}`, {
+    method: "DELETE",
+  });
+}
+
 export async function updateUserProfile(data: { name?: string; avatar?: string | null }): Promise<User> {
   return apiRequest<User>("/api/user/me", {
     method: "PATCH",
