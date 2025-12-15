@@ -161,7 +161,7 @@ export default function History() {
                       href={`/event/${event.id}?from=history`}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      View Details
+                  View Details
                     </Link>
                 </Button>
               </div>

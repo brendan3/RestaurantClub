@@ -136,9 +136,9 @@ export default function Profile() {
           aria-label="Edit profile"
         >
           <Avatar className="w-32 h-32 mx-auto border-4 border-background shadow-xl transition-transform group-hover:scale-[1.02]">
-            <AvatarImage src={user.avatar || undefined} />
-            <AvatarFallback>{user.name[0]}</AvatarFallback>
-          </Avatar>
+          <AvatarImage src={user.avatar || undefined} />
+          <AvatarFallback>{user.name[0]}</AvatarFallback>
+        </Avatar>
         </button>
         <div>
           <h1 className="text-3xl font-heading font-bold">{user.name}</h1>

@@ -42,7 +42,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       currentUserCanAttend: Boolean(r.currentUserCanAttend),
     }));
   };
-
+  
   // Health check endpoint
   app.get("/api/health", (_req, res) => {
     res.json({ 

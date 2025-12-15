@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { SOCIAL_FEED, ASSETS } from "@/lib/mockData";
+import { ASSETS } from "@/lib/mockData";
 import { Calendar, Clock, MapPin, MessageSquare, Heart, Share2, ChefHat, Check, X, Plus, ExternalLink, ChevronLeft, ChevronRight, Copy, Mail, MessageCircle as MessageCircleIcon, Utensils, CheckCircle2, History } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -15,9 +15,65 @@ import {
 } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { useEventModal } from "@/lib/event-modal-context";
-import { getUpcomingEvents, getPastEvents, getUserRsvp, rsvpToEvent, getEventRsvps, getUserClubs, getWishlist, removeFromWishlist, getEventImageUrl, type Event, type Club, type WishlistRestaurant } from "@/lib/api";
+import { getUpcomingEvents, getPastEvents, getUserRsvp, rsvpToEvent, getEventRsvps, getUserClubs, getWishlist, removeFromWishlist, getEventImageUrl, searchNearbyRestaurants, getRestaurantPhotoUrl, type Event, type Club, type WishlistRestaurant, type NearbyPlace } from "@/lib/api";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
+
+/**
+ * Geolocation helper that always settles (resolves or rejects) within timeoutMs.
+ * This avoids hanging forever in environments where WKWebView never calls the
+ * success or error callbacks.
+ */
+const getCurrentPositionSafe = (timeoutMs = 10000): Promise<GeolocationPosition> => {
+  return new Promise((resolve, reject) => {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+      const err: any = new Error("Geolocation not supported");
+      err.code = 0;
+      console.warn("RC: geolocation NOT available in navigator");
+      reject(err);
+      return;
+    }
+
+    let settled = false;
+
+    const finish = (fn: (value: any) => void, value: any) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn(value);
+    };
+
+    const timer = setTimeout(() => {
+      if (settled) return;
+      const err: any = new Error("Geolocation timeout");
+      // Align with standard TIMEOUT code (3)
+      err.code = 3;
+      console.warn("RC: geolocation manual timeout fired");
+      finish(reject, err);
+    }, timeoutMs);
+
+    console.log("RC: calling navigator.geolocation.getCurrentPosition");
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        console.log("RC: geolocation SUCCESS", {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        });
+        finish(resolve, pos);
+      },
+      (error) => {
+        console.error("RC: geolocation ERROR", error);
+        finish(reject, error);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: timeoutMs,
+        maximumAge: 60000,
+      }
+    );
+  });
+};
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -35,6 +91,10 @@ export default function Dashboard() {
   const [wishlist, setWishlist] = useState<WishlistRestaurant[]>([]);
   const [pastEvents, setPastEvents] = useState<Event[]>([]);
   const [allUserRsvps, setAllUserRsvps] = useState<Map<string, any>>(new Map());
+
+  // Nearby restaurants state
+  const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[]>([]);
+  const [isLoadingNearby, setIsLoadingNearby] = useState(false);
 
   // Current event based on index
   const upcomingEvent = upcomingEvents.length > 0 ? upcomingEvents[currentIndex] : null;
@@ -55,6 +115,11 @@ export default function Dashboard() {
       loadEventRsvps(upcomingEvent.id);
     }
   }, [currentIndex, upcomingEvents]);
+
+  // Load nearby restaurants on mount
+  useEffect(() => {
+    searchNearbyEats();
+  }, []);
 
   const loadDashboardData = async () => {
     try {
@@ -216,6 +281,27 @@ Sign up at the app and enter the code to join!`;
       toast.success("Removed from wishlist");
     } catch (error: any) {
       toast.error(error.message || "Failed to remove from wishlist");
+    }
+  };
+
+  // Search for nearby restaurants
+  const searchNearbyEats = async () => {
+    setIsLoadingNearby(true);
+    try {
+      // Get user's location
+      const position = await getCurrentPositionSafe(8000);
+      const latitude = position.coords.latitude;
+      const longitude = position.coords.longitude;
+
+      // Search for "best food" near the user
+      const result = await searchNearbyRestaurants(latitude, longitude);
+      setNearbyPlaces(result.places.slice(0, 6)); // Limit to 6 results
+    } catch (geoError: any) {
+      console.warn("RC: geolocation failed for nearby eats", geoError);
+      // Don't show error toast for this - it's just a nice-to-have feature
+      setNearbyPlaces([]);
+    } finally {
+      setIsLoadingNearby(false);
     }
   };
 
@@ -427,8 +513,8 @@ Sign up at the app and enter the code to join!`;
                   onClick={() => setIsAddEventOpen(true)}
                 >
                   <Plus className="w-4 h-4 mr-2" />
-                  Create Event
-                </Button>
+            Create Event
+          </Button>
                 <Button
                   asChild
                   variant="outline"
@@ -669,55 +755,65 @@ Sign up at the app and enter the code to join!`;
             </Card>
           )}
 
-          {/* Recent Activity */}
+          {/* Eats Near Me */}
           <div className="space-y-5">
-            <h3 className="font-heading font-bold text-xl text-foreground/80 px-2">Recent Buzz 🐝</h3>
-            {SOCIAL_FEED.map((post) => (
-              <Card key={post.id} className="border-none shadow-sm hover:shadow-soft transition-all duration-300 bg-white/80">
-                <CardContent className="p-5">
-                  <div className="flex gap-4">
-                    <Avatar className="w-12 h-12 border border-border shadow-sm">
-                      <AvatarImage src={post.user.avatar} />
-                      <AvatarFallback>{post.user.name[0]}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <div className="flex justify-between items-start mb-1">
-                        <span className="font-bold text-base text-foreground">{post.user.name}</span>
-                        <span className="text-xs text-muted-foreground font-medium bg-muted px-2 py-1 rounded-full">{post.time}</span>
+            <h3 className="font-heading font-bold text-xl text-foreground/80 px-2">Eats Near Me 🤤</h3>
+            {isLoadingNearby ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  <p className="mt-2 text-sm text-muted-foreground">Finding delicious spots near you...</p>
+                </div>
+              </div>
+            ) : nearbyPlaces.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {nearbyPlaces.map((place) => {
+                  const photoUrl = getRestaurantPhotoUrl(place.photoName, 300);
+                  return (
+                    <Card key={place.id} className="border-none shadow-sm hover:shadow-soft transition-all duration-300 bg-white/80 overflow-hidden">
+                      <div className="aspect-[4/3] relative overflow-hidden">
+                        {photoUrl ? (
+                          <img
+                            src={photoUrl}
+                            alt={place.name}
+                            loading="lazy"
+                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-700"
+                            onError={(e) => {
+                              // Hide broken images
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-muted flex items-center justify-center">
+                            <Utensils className="w-12 h-12 text-muted-foreground/50" />
+                          </div>
+                        )}
+                        {place.rating && (
+                          <div className="absolute top-2 right-2 bg-white/90 backdrop-blur px-2 py-1 rounded-lg flex items-center gap-1 text-xs font-bold shadow-sm">
+                            <Heart className="w-3 h-3 fill-red-400 text-red-400" />
+                            {place.rating}
+                          </div>
+                        )}
                       </div>
-                      
-                      {post.type === 'comment' && (
-                        <p className="text-base text-foreground/80 leading-relaxed">{post.content}</p>
-                      )}
-                      
-                      {post.type === 'photo' && (
-                        <div className="mt-3 space-y-3">
-                          <p className="text-base text-foreground/80">{post.content}</p>
-                          <div className="rounded-2xl overflow-hidden shadow-sm">
-                            <img src={post.image} alt="Post" className="w-full h-56 object-cover hover:scale-105 transition-transform duration-700" />
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex gap-6 mt-4">
-                        <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors font-medium group">
-                          <div className="p-1.5 rounded-full bg-transparent group-hover:bg-primary/10 transition-colors">
-                            <Heart className="w-4 h-4" /> 
-                          </div>
-                          {post.likes}
-                        </button>
-                        <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors font-medium group">
-                          <div className="p-1.5 rounded-full bg-transparent group-hover:bg-primary/10 transition-colors">
-                            <MessageSquare className="w-4 h-4" />
-                          </div>
-                          Reply
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                      <CardContent className="p-4">
+                        <h4 className="font-bold text-foreground truncate">{place.name}</h4>
+                        <p className="text-sm text-muted-foreground truncate mt-1">{place.address}</p>
+                        {place.primaryType && (
+                          <p className="text-xs text-primary/70 capitalize mt-2">
+                            {place.primaryType.replace(/_/g, ' ').replace(' restaurant', '')}
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Utensils className="w-12 h-12 mx-auto text-muted-foreground/50 mb-2" />
+                <p className="text-sm text-muted-foreground">Couldn't find restaurants nearby right now.</p>
+              </div>
+            )}
           </div>
         </div>
 
