@@ -36,7 +36,7 @@ import { toast } from "sonner";
 export default function EventDetail() {
   const [, params] = useRoute("/event/:id");
   const { user } = useAuth();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const eventId = params?.id;
 
   const [event, setEvent] = useState<any>(null);
@@ -57,6 +57,12 @@ export default function EventDetail() {
   const [activeHeroPhotoIndex, setActiveHeroPhotoIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+
+  // Determine back navigation destination based on query params
+  const backDestination = (() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('from') === 'history' ? '/history' : '/';
+  })();
   const [isDeletingEvent, setIsDeletingEvent] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [activeLightboxIndex, setActiveLightboxIndex] = useState(0);
@@ -382,7 +388,7 @@ export default function EventDetail() {
     <div className="space-y-8">
       {/* Back Button */}
       <Button variant="ghost" asChild className="gap-2 -ml-2">
-        <Link href="/">
+        <Link href={backDestination}>
           <ArrowLeft className="w-4 h-4" /> Back
         </Link>
       </Button>

@@ -89,11 +89,11 @@ export default function History() {
             key={event.id}
             role="button"
             tabIndex={0}
-            onClick={() => navigate(`/event/${event.id}`)}
+            onClick={() => navigate(`/event/${event.id}?from=history`)}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
-                navigate(`/event/${event.id}`);
+                navigate(`/event/${event.id}?from=history`);
               }
             }}
             className="border-none shadow-soft group overflow-hidden flex flex-col h-full cursor-pointer hover:-translate-y-0.5 transition-transform"
@@ -158,7 +158,7 @@ export default function History() {
                   </div>
                   <Button asChild variant="ghost" size="sm" className="text-xs h-8 text-primary hover:text-primary hover:bg-primary/10">
                     <Link
-                      href={`/event/${event.id}`}
+                      href={`/event/${event.id}?from=history`}
                       onClick={(e) => e.stopPropagation()}
                     >
                       View Details
