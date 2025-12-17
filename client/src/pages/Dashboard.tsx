@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { ASSETS } from "@/lib/mockData";
-import { Calendar, Clock, MapPin, MessageSquare, Heart, Share2, ChefHat, Check, X, Plus, ExternalLink, ChevronLeft, ChevronRight, Copy, Mail, MessageCircle as MessageCircleIcon, Utensils, CheckCircle2, History } from "lucide-react";
+import { Calendar, Clock, MapPin, MessageSquare, Heart, Share2, ChefHat, Check, X, Plus, ExternalLink, Copy, Mail, MessageCircle as MessageCircleIcon, Utensils, CheckCircle2, History } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useEventModal } from "@/lib/event-modal-context";
 import { getUpcomingEvents, getPastEvents, getUserRsvp, rsvpToEvent, getEventRsvps, getUserClubs, getWishlist, removeFromWishlist, getEventImageUrl, searchNearbyRestaurants, getRestaurantPhotoUrl, type Event, type Club, type WishlistRestaurant, type NearbyPlace } from "@/lib/api";
@@ -95,6 +96,10 @@ export default function Dashboard() {
   // Nearby restaurants state
   const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[]>([]);
   const [isLoadingNearby, setIsLoadingNearby] = useState(false);
+
+  // Photo gallery state
+  const [galleryPlace, setGalleryPlace] = useState<NearbyPlace | null>(null);
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
 
   // Current event based on index
   const upcomingEvent = upcomingEvents.length > 0 ? upcomingEvents[currentIndex] : null;
@@ -303,6 +308,32 @@ Sign up at the app and enter the code to join!`;
     } finally {
       setIsLoadingNearby(false);
     }
+  };
+
+  // Photo gallery functions
+  const openPhotoGallery = (place: NearbyPlace) => {
+    if (!place.photoNames?.length) return;
+    setGalleryPlace(place);
+    setCurrentPhotoIndex(0);
+  };
+
+  const closePhotoGallery = () => {
+    setGalleryPlace(null);
+    setCurrentPhotoIndex(0);
+  };
+
+  const goToPrevPhoto = () => {
+    if (!galleryPlace?.photoNames) return;
+    setCurrentPhotoIndex(prev =>
+      prev === 0 ? galleryPlace.photoNames!.length - 1 : prev - 1
+    );
+  };
+
+  const goToNextPhoto = () => {
+    if (!galleryPlace?.photoNames) return;
+    setCurrentPhotoIndex(prev =>
+      prev === galleryPlace.photoNames!.length - 1 ? 0 : prev + 1
+    );
   };
 
   // "What's Next" helpers
@@ -720,6 +751,82 @@ Sign up at the app and enter the code to join!`;
         </DialogContent>
       </Dialog>
 
+      {/* Photo Gallery Modal */}
+      <Dialog open={!!galleryPlace} onOpenChange={() => closePhotoGallery()}>
+        <DialogContent className="max-w-4xl w-full p-0 bg-black/95 border-none">
+          {galleryPlace && galleryPlace.photoNames && galleryPlace.photoNames.length > 0 && (
+            <div className="relative">
+              {/* Close button */}
+              <button
+                onClick={closePhotoGallery}
+                className="absolute top-4 right-4 z-50 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              {/* Main image */}
+              <div className="relative aspect-[4/3] overflow-hidden">
+                <img
+                  src={getRestaurantPhotoUrl(galleryPlace.photoNames[currentPhotoIndex], 1200)}
+                  alt={`${galleryPlace.name} - Photo ${currentPhotoIndex + 1}`}
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    // Hide broken images
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              </div>
+
+              {/* Navigation arrows */}
+              {galleryPlace.photoNames.length > 1 && (
+                <>
+                  <button
+                    onClick={goToPrevPhoto}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+                  >
+                    <ChevronLeft className="w-6 h-6" />
+                  </button>
+                  <button
+                    onClick={goToNextPhoto}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+                  >
+                    <ChevronRight className="w-6 h-6" />
+                  </button>
+                </>
+              )}
+
+              {/* Photo counter and restaurant info */}
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">
+                <div className="text-white">
+                  <h3 className="text-xl font-bold mb-1">{galleryPlace.name}</h3>
+                  <p className="text-sm text-white/80 mb-2">{galleryPlace.address}</p>
+                  {galleryPlace.photoNames.length > 1 && (
+                    <p className="text-sm text-white/60">
+                      {currentPhotoIndex + 1} of {galleryPlace.photoNames.length} photos
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Thumbnail navigation dots */}
+              {galleryPlace.photoNames.length > 1 && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                  {galleryPlace.photoNames.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setCurrentPhotoIndex(index)}
+                      className={`w-2 h-2 rounded-full transition-colors ${
+                        index === currentPhotoIndex ? 'bg-white' : 'bg-white/50'
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Two Column Layout */}
       <div className="grid md:grid-cols-3 gap-8">
         {/* Left Column: Status & Actions */}
@@ -768,10 +875,13 @@ Sign up at the app and enter the code to join!`;
             ) : nearbyPlaces.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {nearbyPlaces.map((place) => {
-                  const photoUrl = getRestaurantPhotoUrl(place.photoName, 300);
+                  const photoUrl = place.photoNames?.length ? getRestaurantPhotoUrl(place.photoNames[0], 300) : undefined;
                   return (
                     <Card key={place.id} className="border-none shadow-sm hover:shadow-soft transition-all duration-300 bg-white/80 overflow-hidden">
-                      <div className="aspect-[4/3] relative overflow-hidden">
+                      <div
+                        className="aspect-[4/3] relative overflow-hidden cursor-pointer"
+                        onClick={() => place.photoNames?.length && openPhotoGallery(place)}
+                      >
                         {photoUrl ? (
                           <img
                             src={photoUrl}
@@ -786,6 +896,12 @@ Sign up at the app and enter the code to join!`;
                         ) : (
                           <div className="w-full h-full bg-muted flex items-center justify-center">
                             <Utensils className="w-12 h-12 text-muted-foreground/50" />
+                          </div>
+                        )}
+                        {place.photoNames && place.photoNames.length > 1 && (
+                          <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur px-2 py-1 rounded-lg flex items-center gap-1 text-xs font-bold text-white">
+                            <Heart className="w-3 h-3" />
+                            {place.photoNames.length}
                           </div>
                         )}
                         {place.rating && (

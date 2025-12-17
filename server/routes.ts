@@ -1166,7 +1166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     rating?: number;
     priceLevel?: string;
     googleMapsUrl?: string;
-    photoName?: string; // Google Places photo reference name
+    photoNames?: string[]; // Google Places photo reference names (multiple photos)
   }
 
   // Search nearby restaurants using Google Places API (New)
@@ -1265,7 +1265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         rating: place.rating || undefined,
         priceLevel: place.priceLevel || undefined,
         googleMapsUrl: place.googleMapsUri || undefined,
-        photoName: place.photos?.[0]?.name || undefined,
+        photoNames: place.photos?.map((photo: any) => photo.name).filter(Boolean) || [],
       }));
       
       res.json({ places });
@@ -1381,7 +1381,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         rating: place.rating || undefined,
         priceLevel: place.priceLevel || undefined,
         googleMapsUrl: place.googleMapsUri || undefined,
-        photoName: place.photos?.[0]?.name || undefined,
+        photoNames: place.photos?.map((photo: any) => photo.name).filter(Boolean) || [],
       }));
       
       res.json({ places });

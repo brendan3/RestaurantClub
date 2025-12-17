@@ -308,7 +308,7 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated, defa
     // Capture Google Places info for photo persistence
     setSelectedPlace({
       placeId: place.id,
-      photoName: place.photoName,
+      photoName: place.photoNames?.[0],
     });
     
     setShowNearbyResults(false);
@@ -379,7 +379,7 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated, defa
             {showNearbyResults && nearbyPlaces.length > 0 && (
               <div className="max-h-64 overflow-y-auto space-y-1 border border-border/50 rounded-xl bg-white">
                 {nearbyPlaces.map((place) => {
-                  const photoUrl = getRestaurantPhotoUrl(place.photoName, 200);
+                  const photoUrl = place.photoNames?.length ? getRestaurantPhotoUrl(place.photoNames[0], 200) : undefined;
                   return (
                     <button
                       key={place.id}

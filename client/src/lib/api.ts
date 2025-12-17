@@ -471,7 +471,7 @@ export interface NearbyPlace {
   rating?: number;
   priceLevel?: string;
   googleMapsUrl?: string;
-  photoName?: string; // Google Places photo reference for proxied loading
+  photoNames?: string[]; // Google Places photo references for proxied loading (multiple photos)
 }
 
 /**
