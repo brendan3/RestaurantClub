@@ -1,12 +1,13 @@
 import { Link, useLocation } from "wouter";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
-import { Calendar, Camera, ChevronLeft, Home, Map, MessageCircle, Plus, Upload, User, Users } from "lucide-react";
+import { Calendar, Camera, ChevronLeft, Home, Map, MessageCircle, Plus, Upload, User, Users, Bell, BarChart2 } from "lucide-react";
 import { ASSETS } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useEventModal } from "@/lib/event-modal-context";
-import { getPastEvents, getUpcomingEvents, uploadEventPhoto, type Event } from "@/lib/api";
+import { getPastEvents, getUpcomingEvents, uploadEventPhoto, getNotificationSummary, markNotificationsRead, type Event, type Notification } from "@/lib/api";
 import AddEventModal from "@/components/AddEventModal";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Sheet,
   SheetContent,
@@ -35,6 +36,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const [pastEvents, setPastEvents] = useState<Event[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Notification state
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
+
   // Fetch next upcoming event for the sidebar
   useEffect(() => {
     const fetchNextEvent = async () => {
@@ -49,6 +56,78 @@ export default function AppShell({ children }: { children: ReactNode }) {
     };
     fetchNextEvent();
   }, [location]); // Refetch when location changes
+
+  // Fetch notifications on mount and poll periodically
+  const fetchNotifications = async () => {
+    try {
+      setIsLoadingNotifications(true);
+      const summary = await getNotificationSummary();
+      setUnreadCount(summary.unreadCount);
+      setNotifications(summary.notifications);
+    } catch (error) {
+      // Silently fail - user might not be logged in yet
+    } finally {
+      setIsLoadingNotifications(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    // Poll every 60 seconds
+    const interval = setInterval(fetchNotifications, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Mark as read when dropdown opens
+  useEffect(() => {
+    if (isNotificationOpen && unreadCount > 0) {
+      markNotificationsRead().then((result) => {
+        setUnreadCount(result.unreadCount);
+      }).catch(() => {
+        // Silently fail
+      });
+    }
+  }, [isNotificationOpen]);
+
+  // Format relative time
+  const formatRelativeTime = (dateString: string): string => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
+  // Get icon for notification type
+  const getNotificationIcon = (type: Notification["type"]) => {
+    switch (type) {
+      case "event_created":
+        return Calendar;
+      case "poll_started":
+        return BarChart2;
+      case "photos_added":
+        return Camera;
+      default:
+        return Bell;
+    }
+  };
+
+  // Handle notification click
+  const handleNotificationClick = (notif: Notification) => {
+    setIsNotificationOpen(false);
+    if (notif.eventId) {
+      navigate(`/event/${notif.eventId}`);
+    } else if (notif.pollId) {
+      navigate("/club");
+    }
+  };
 
   const handleComingSoon = (feature: string) => {
     toast({
@@ -292,6 +371,61 @@ export default function AppShell({ children }: { children: ReactNode }) {
             <button onClick={() => setIsAddEventOpen(true)} className="w-9 h-9 rounded-full bg-primary text-white shadow-sm flex items-center justify-center active:scale-95 transition-transform">
                 <Plus className="w-5 h-5" />
             </button>
+            {/* Notification Bell */}
+            <Popover open={isNotificationOpen} onOpenChange={setIsNotificationOpen}>
+              <PopoverTrigger asChild>
+                <button className="relative w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center text-foreground/80 active:scale-95 transition-transform">
+                  <Bell className="w-4 h-4" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-0" align="end" sideOffset={8}>
+                <div className="p-4 border-b">
+                  <h3 className="font-heading font-bold text-lg">Notifications</h3>
+                </div>
+                <div className="max-h-[400px] overflow-y-auto">
+                  {isLoadingNotifications ? (
+                    <div className="p-8 text-center text-sm text-muted-foreground">Loading...</div>
+                  ) : notifications.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <p className="text-sm text-muted-foreground">No notifications yet</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y">
+                      {notifications.map((notif) => {
+                        const Icon = getNotificationIcon(notif.type);
+                        return (
+                          <button
+                            key={notif.id}
+                            onClick={() => handleNotificationClick(notif)}
+                            className="w-full text-left p-4 hover:bg-muted/50 transition-colors"
+                          >
+                            <div className="flex gap-3">
+                              <div className="flex-shrink-0 mt-0.5">
+                                <Icon className="w-5 h-5 text-primary" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-foreground">{notif.message}</p>
+                                {notif.type === "event_created" && notif.needsRsvp && (
+                                  <p className="text-xs text-primary mt-1 font-medium">RSVP needed</p>
+                                )}
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {formatRelativeTime(notif.createdAt)}
+                                </p>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
             <Link href="/profile">
                 <button className="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center text-foreground/80">
                     <User className="w-4 h-4" />

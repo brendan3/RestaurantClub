@@ -199,5 +199,28 @@ export type DatePollWithOptions = {
   options: DatePollOption[];
 };
 
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+export const notificationTypeEnum = pgEnum("notification_type", [
+  "event_created",
+  "poll_started",
+  "photos_added",
+]);
+
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: notificationTypeEnum("type").notNull(),
+  eventId: varchar("event_id").references(() => events.id, { onDelete: "cascade" }),
+  pollId: varchar("poll_id").references(() => datePolls.id, { onDelete: "cascade" }),
+  message: text("message"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  isRead: boolean("is_read").default(false).notNull(),
+});
+
+export type Notification = typeof notifications.$inferSelect;
+
 export type SignupInput = z.infer<typeof signupSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

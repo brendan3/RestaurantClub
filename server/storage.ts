@@ -8,6 +8,7 @@ import {
   type DatePoll,
   type DatePollOption,
   type DatePollWithOptions,
+  type Notification,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -109,6 +110,18 @@ export interface IStorage {
   closeDatePoll(pollId: string, userId: string): Promise<DatePollWithOptions>;
   getDatePollById(pollId: string): Promise<DatePoll | undefined>;
   getDatePollOptions(pollId: string): Promise<DatePollOption[]>;
+
+  // Notification methods
+  getNotificationsForUser(userId: string, opts?: { limit?: number }): Promise<Notification[]>;
+  getUnreadNotificationCount(userId: string): Promise<number>;
+  markAllNotificationsRead(userId: string): Promise<void>;
+  createNotifications(rows: Array<{
+    userId: string;
+    type: "event_created" | "poll_started" | "photos_added";
+    eventId?: string;
+    pollId?: string;
+    message?: string;
+  }>): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -350,6 +363,23 @@ export class MemStorage implements IStorage {
 
   async getDatePollOptions(): Promise<DatePollOption[]> {
     return [];
+  }
+
+  // Notification methods
+  async getNotificationsForUser(): Promise<Notification[]> {
+    return [];
+  }
+
+  async getUnreadNotificationCount(): Promise<number> {
+    return 0;
+  }
+
+  async markAllNotificationsRead(): Promise<void> {
+    // No-op
+  }
+
+  async createNotifications(): Promise<void> {
+    // No-op
   }
 }
 

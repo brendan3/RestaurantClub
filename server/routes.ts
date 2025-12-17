@@ -110,6 +110,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================
+  // NOTIFICATION ENDPOINTS
+  // ============================================
+
+  // Get notification summary (unread count + recent notifications)
+  app.get("/api/notifications/summary", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.json({ unreadCount: 0, notifications: [] });
+    }
+
+    try {
+      const userId = req.user!.id;
+      const unreadCount = await storage.getUnreadNotificationCount(userId);
+      const notifications = await storage.getNotificationsForUser(userId, { limit: 3 });
+
+      // Check RSVP status for event_created notifications
+      const notificationsWithRsvp = await Promise.all(
+        notifications.map(async (notif) => {
+          let needsRsvp = false;
+          if (notif.type === "event_created" && notif.eventId) {
+            const userRsvp = await storage.getUserRsvp(notif.eventId, userId);
+            needsRsvp = !userRsvp;
+          }
+          return {
+            id: notif.id,
+            type: notif.type,
+            eventId: notif.eventId,
+            pollId: notif.pollId,
+            message: notif.message || "",
+            createdAt: notif.createdAt.toISOString(),
+            needsRsvp,
+          };
+        })
+      );
+
+      res.json({
+        unreadCount,
+        notifications: notificationsWithRsvp,
+      });
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      res.status(500).json({ error: "Failed to fetch notifications" });
+    }
+  });
+
+  // Mark all notifications as read
+  app.post("/api/notifications/mark-read", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.json({ unreadCount: 0 });
+    }
+
+    try {
+      const userId = req.user!.id;
+      await storage.markAllNotificationsRead(userId);
+      const unreadCount = await storage.getUnreadNotificationCount(userId);
+      res.json({ unreadCount });
+    } catch (error) {
+      console.error("Error marking notifications as read:", error);
+      res.status(500).json({ error: "Failed to mark notifications as read" });
+    }
+  });
+
+  // ============================================
   // CLUB ENDPOINTS
   // ============================================
   
@@ -401,6 +463,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const optionsSummary = await buildDatePollOptionsSummary(created.poll.id, req.user!.id);
+      
+      // Create notifications for all club members
+      try {
+        const members = await storage.getClubMembers(clubId);
+        await storage.createNotifications(
+          members.map(m => ({
+            userId: m.id,
+            type: "poll_started",
+            pollId: created.poll.id,
+            message: "New date poll is open – add your availability",
+          }))
+        );
+      } catch (notifError) {
+        console.error("Error creating poll notifications:", notifError);
+        // Don't fail the request if notifications fail
+      }
+      
       res.json({
         poll: created.poll,
         options: optionsSummary,
@@ -656,6 +735,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         placePhotoName: placePhotoName || null,
       });
       
+      // Create notifications for all club members
+      try {
+        const members = await storage.getClubMembers(clubs[0].id);
+        const eventDateFormatted = new Date(eventDate).toLocaleDateString("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        });
+        await storage.createNotifications(
+          members.map(m => ({
+            userId: m.id,
+            type: "event_created",
+            eventId: event.id,
+            message: `New dinner added: ${restaurantName} on ${eventDateFormatted}`,
+          }))
+        );
+      } catch (notifError) {
+        console.error("Error creating event notifications:", notifError);
+        // Don't fail the request if notifications fail
+      }
+      
       res.json(event);
     } catch (error) {
       console.error("Error creating event:", error);
@@ -831,6 +931,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If event has no imageUrl yet, use the first recap photo as thumbnail
       if (!event.imageUrl) {
         await storage.updateEvent(event.id, { imageUrl });
+      }
+
+      // Create notifications for all club members except the uploader
+      try {
+        const members = await storage.getClubMembers(event.clubId);
+        await storage.createNotifications(
+          members
+            .filter(m => m.id !== req.user!.id)
+            .map(m => ({
+              userId: m.id,
+              type: "photos_added",
+              eventId: event.id,
+              message: `New recap photos added for ${event.restaurantName}`,
+            }))
+        );
+      } catch (notifError) {
+        console.error("Error creating photo notifications:", notifError);
+        // Don't fail the request if notifications fail
       }
 
       res.json(created);

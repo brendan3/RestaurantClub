@@ -2,9 +2,9 @@ import { eq, desc, asc, and, gte, lt, sql } from "drizzle-orm";
 import { db } from "./db"; // <-- FIX 1: Import 'db' directly (not getDb)
 import { 
   users, events, clubs, clubMembers, eventAttendees, eventTags, wishlistRestaurants, eventPhotos,
-  datePolls, datePollOptions, datePollVotes,
+  datePolls, datePollOptions, datePollVotes, notifications,
   type User, type InsertUser, type Event, type Club, type WishlistRestaurant, type EventPhoto,
-  type DatePoll, type DatePollOption, type DatePollWithOptions,
+  type DatePoll, type DatePollOption, type DatePollWithOptions, type Notification,
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -545,5 +545,54 @@ export class DatabaseStorage implements IStorage {
         asc(datePollOptions.optionDate),
         asc(datePollOptions.id),
       );
+  }
+
+  // Notification methods
+  async getNotificationsForUser(userId: string, opts?: { limit?: number }): Promise<Notification[]> {
+    let query = db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, userId))
+      .orderBy(desc(notifications.createdAt));
+
+    if (opts?.limit) {
+      query = query.limit(opts.limit) as any;
+    }
+
+    return await query;
+  }
+
+  async getUnreadNotificationCount(userId: string): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(notifications)
+      .where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
+    
+    return Number(result[0]?.count || 0);
+  }
+
+  async markAllNotificationsRead(userId: string): Promise<void> {
+    await db
+      .update(notifications)
+      .set({ isRead: true })
+      .where(eq(notifications.userId, userId));
+  }
+
+  async createNotifications(rows: Array<{
+    userId: string;
+    type: "event_created" | "poll_started" | "photos_added";
+    eventId?: string;
+    pollId?: string;
+    message?: string;
+  }>): Promise<void> {
+    if (rows.length === 0) return;
+
+    await db.insert(notifications).values(rows.map(row => ({
+      userId: row.userId,
+      type: row.type,
+      eventId: row.eventId || null,
+      pollId: row.pollId || null,
+      message: row.message || null,
+    })));
   }
 }

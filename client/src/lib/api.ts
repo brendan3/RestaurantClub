@@ -352,6 +352,41 @@ export async function updateUserProfile(data: { name?: string; avatar?: string |
 }
 
 // ============================================
+// NOTIFICATION FUNCTIONS
+// ============================================
+
+export interface Notification {
+  id: string;
+  type: "event_created" | "poll_started" | "photos_added";
+  eventId?: string | null;
+  pollId?: string | null;
+  message: string;
+  createdAt: string;
+  needsRsvp?: boolean;
+}
+
+export interface NotificationSummary {
+  unreadCount: number;
+  notifications: Notification[];
+}
+
+/**
+ * Get notification summary (unread count + recent notifications)
+ */
+export async function getNotificationSummary(): Promise<NotificationSummary> {
+  return apiRequest<NotificationSummary>("/api/notifications/summary");
+}
+
+/**
+ * Mark all notifications as read
+ */
+export async function markNotificationsRead(): Promise<{ unreadCount: number }> {
+  return apiRequest<{ unreadCount: number }>("/api/notifications/mark-read", {
+    method: "POST",
+  });
+}
+
+// ============================================
 // RSVP FUNCTIONS
 // ============================================
 

@@ -871,7 +871,7 @@ Sign up at the app and enter the code to join!`;
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
                   <p className="mt-2 text-sm text-muted-foreground">Finding delicious spots near you...</p>
                 </div>
-              </div>
+                      </div>
             ) : nearbyPlaces.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {nearbyPlaces.map((place) => {
@@ -896,8 +896,8 @@ Sign up at the app and enter the code to join!`;
                         ) : (
                           <div className="w-full h-full bg-muted flex items-center justify-center">
                             <Utensils className="w-12 h-12 text-muted-foreground/50" />
-                          </div>
-                        )}
+                        </div>
+                      )}
                         {place.photoNames && place.photoNames.length > 1 && (
                           <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur px-2 py-1 rounded-lg flex items-center gap-1 text-xs font-bold text-white">
                             <Heart className="w-3 h-3" />
@@ -919,8 +919,8 @@ Sign up at the app and enter the code to join!`;
                             {place.primaryType.replace(/_/g, ' ').replace(' restaurant', '')}
                           </p>
                         )}
-                      </CardContent>
-                    </Card>
+                </CardContent>
+              </Card>
                   );
                 })}
               </div>
