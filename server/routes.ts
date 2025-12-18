@@ -7,6 +7,7 @@ import { generateJoinCode, datePollOptions, datePolls, datePollVotes } from "@sh
 import { isCloudinaryConfigured, uploadEventImage, uploadUserAvatar } from "./cloudinary";
 import { db } from "./db";
 import { and, asc, desc, eq, gt, sql } from "drizzle-orm";
+import { sendPushNotifications } from "./push";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const useMockData = !process.env.DATABASE_URL;
@@ -64,6 +65,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Get current user (protected)
   app.get("/api/user/me", auth.requireAuth, auth.getCurrentUser);
+
+  // Register a device token for push notifications (native clients)
+  app.post("/api/push/devices", auth.requireAuth, async (req, res) => {
+    try {
+      const { deviceToken, platform } = req.body as {
+        deviceToken?: string;
+        platform?: "ios" | "android" | "web";
+      };
+
+      if (!deviceToken || typeof deviceToken !== "string" || !deviceToken.trim()) {
+        return res.status(400).json({ error: "deviceToken is required" });
+      }
+
+      const plat = platform ?? "ios";
+      if (!["ios", "android", "web"].includes(plat)) {
+        return res.status(400).json({ error: "platform must be one of ios|android|web" });
+      }
+
+      await storage.registerPushDevice(req.user!.id, deviceToken.trim(), plat);
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error registering push device:", err);
+      res.status(500).json({ error: "Failed to register push device" });
+    }
+  });
 
   // Get a user by ID (safe fields only)
   app.get("/api/users/:id", auth.requireAuth, async (req, res) => {
@@ -569,6 +595,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create notifications for all club members
       try {
         const members = await storage.getClubMembers(clubId);
+        const memberIds = members.map((m) => m.id);
         await storage.createNotifications(
           members.map(m => ({
             userId: m.id,
@@ -577,6 +604,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             message: "New date poll is open – add your availability",
           }))
         );
+
+        // Push (stub)
+        try {
+          await sendPushNotifications({
+            userIds: memberIds,
+            title: "New date poll is open",
+            body: "Vote on your availability for our next dinner.",
+            data: { type: "poll", pollId: created.poll.id, clubId },
+          });
+        } catch (err) {
+          console.error("[push] Failed to send push notifications", err);
+        }
       } catch (notifError) {
         console.error("Error creating poll notifications:", notifError);
         // Don't fail the request if notifications fail
@@ -840,11 +879,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create notifications for all club members
       try {
         const members = await storage.getClubMembers(clubs[0].id);
+        const memberIds = members.map((m) => m.id);
         const eventDateFormatted = new Date(eventDate).toLocaleDateString("en-US", {
           weekday: "short",
           month: "short",
           day: "numeric",
         });
+        const pushBody = `New dinner at ${restaurantName} on ${eventDateFormatted}`;
+
         await storage.createNotifications(
           members.map(m => ({
             userId: m.id,
@@ -853,6 +895,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             message: `New dinner added: ${restaurantName} on ${eventDateFormatted}`,
           }))
         );
+
+        // Push (stub) - do not fail request if it errors
+        try {
+          await sendPushNotifications({
+            userIds: memberIds,
+            title: "New dinner added",
+            body: pushBody,
+            data: { type: "event", eventId: event.id },
+          });
+        } catch (err) {
+          console.error("[push] Failed to send push notifications", err);
+        }
       } catch (notifError) {
         console.error("Error creating event notifications:", notifError);
         // Don't fail the request if notifications fail
@@ -1038,6 +1092,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create notifications for all club members except the uploader
       try {
         const members = await storage.getClubMembers(event.clubId);
+        const memberIds = members.filter((m) => m.id !== req.user!.id).map((m) => m.id);
         await storage.createNotifications(
           members
             .filter(m => m.id !== req.user!.id)
@@ -1048,6 +1103,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
               message: `New recap photos added for ${event.restaurantName}`,
             }))
         );
+
+        // Push (stub)
+        try {
+          await sendPushNotifications({
+            userIds: memberIds,
+            title: "New recap photos added",
+            body: `New photos added for ${event.restaurantName}.`,
+            data: { type: "photos", eventId: event.id },
+          });
+        } catch (err) {
+          console.error("[push] Failed to send push notifications", err);
+        }
       } catch (notifError) {
         console.error("Error creating photo notifications:", notifError);
         // Don't fail the request if notifications fail

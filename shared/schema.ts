@@ -246,5 +246,29 @@ export const notifications = pgTable("notifications", {
 
 export type Notification = typeof notifications.$inferSelect;
 
+// ============================================
+// PUSH DEVICES (APNs/FCM TOKEN REGISTRATION)
+// ============================================
+
+export const pushPlatformEnum = pgEnum("push_platform", ["ios", "android", "web"]);
+
+export const pushDevices = pgTable(
+  "push_devices",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    deviceToken: text("device_token").notNull(),
+    platform: pushPlatformEnum("platform").notNull().default("ios"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    uniq: uniqueIndex("push_devices_user_token_unique").on(t.userId, t.deviceToken),
+  })
+);
+
+export type PushDevice = typeof pushDevices.$inferSelect;
+export type InsertPushDevice = typeof pushDevices.$inferInsert;
+
 export type SignupInput = z.infer<typeof signupSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

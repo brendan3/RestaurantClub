@@ -14,3 +14,30 @@ Set these in **Railway** (backend) and in your local `.env` when running the ser
 - `CLOUDINARY_UPLOAD_FOLDER` (optional, default: `restaurantclub/events`)
 
 If Cloudinary is not configured, `POST /api/events/:id/photos` returns **501** with `{ "error": "Photo uploads not configured yet" }`.
+
+## Native push notifications (iOS) — backend stub
+
+The backend supports **registering device tokens** for native push notifications, but **does not send real pushes yet**.
+Today it only logs what *would* be sent (see `server/push.ts`).
+
+### Register a device token
+
+`POST /api/push/devices` (auth required)
+
+- **Request JSON**
+  - `deviceToken`: string (required)
+  - `platform`: `"ios" | "android" | "web"` (optional, defaults to `"ios"`)
+
+- **Response**
+  - `{ "success": true }`
+
+### iOS (Capacitor/native) flow
+
+- Request push permission from iOS
+- Obtain an APNs device token
+- Call `POST /api/push/devices` with:
+  - `{ "deviceToken": "<apns-token>", "platform": "ios" }`
+
+### Where to plug in real push sending
+
+Replace the logging-only implementation in `server/push.ts` with APNs / OneSignal / FCM calls.

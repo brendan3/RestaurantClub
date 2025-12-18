@@ -1,10 +1,10 @@
-import { eq, desc, asc, and, gte, lt, sql } from "drizzle-orm";
+import { eq, desc, asc, and, gte, lt, sql, inArray } from "drizzle-orm";
 import { db } from "./db"; // <-- FIX 1: Import 'db' directly (not getDb)
 import { 
   users, events, clubs, clubMembers, eventAttendees, eventTags, wishlistRestaurants, eventPhotos,
-  datePolls, datePollOptions, datePollVotes, notifications, clubSuperlatives,
+  datePolls, datePollOptions, datePollVotes, notifications, clubSuperlatives, pushDevices,
   type User, type InsertUser, type Event, type Club, type WishlistRestaurant, type EventPhoto,
-  type DatePoll, type DatePollOption, type DatePollWithOptions, type Notification, type ClubSuperlative,
+  type DatePoll, type DatePollOption, type DatePollWithOptions, type Notification, type ClubSuperlative, type PushDevice,
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -636,5 +636,30 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     return res[0] as ClubSuperlative;
+  }
+
+  // Push devices
+  async registerPushDevice(userId: string, deviceToken: string, platform: string): Promise<void> {
+    const now = new Date();
+    await db
+      .insert(pushDevices)
+      .values({
+        userId,
+        deviceToken,
+        platform: platform as any,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [pushDevices.userId, pushDevices.deviceToken],
+        set: {
+          platform: platform as any,
+          updatedAt: now,
+        },
+      });
+  }
+
+  async getPushDevicesForUsers(userIds: string[]): Promise<PushDevice[]> {
+    if (userIds.length === 0) return [];
+    return await db.select().from(pushDevices).where(inArray(pushDevices.userId, userIds));
   }
 }

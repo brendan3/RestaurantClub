@@ -10,6 +10,7 @@ import {
   type DatePollWithOptions,
   type Notification,
   type ClubSuperlative,
+  type PushDevice,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -130,15 +131,28 @@ export interface IStorage {
     clubId: string,
     input: { slotKey: string; title: string; memberName: string; iconKey: string; avatarEmoji?: string | null; avatarImageUrl?: string | null }
   ): Promise<ClubSuperlative>;
+
+  // Push devices (native push token registration)
+  registerPushDevice(userId: string, deviceToken: string, platform: string): Promise<void>;
+  getPushDevicesForUsers(userIds: string[]): Promise<PushDevice[]>;
 }
 
 export class MemStorage implements IStorage {
   private users: Map<string, User>;
   private superlativesByClub: Map<string, Map<string, ClubSuperlative>>;
+  private pushDevices: Array<{
+    id: string;
+    userId: string;
+    deviceToken: string;
+    platform: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
 
   constructor() {
     this.users = new Map();
     this.superlativesByClub = new Map();
+    this.pushDevices = [];
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -426,6 +440,43 @@ export class MemStorage implements IStorage {
 
     clubMap.set(input.slotKey, row);
     return row;
+  }
+
+  // Push devices
+  async registerPushDevice(userId: string, deviceToken: string, platform: string): Promise<void> {
+    const now = new Date();
+    const existingIdx = this.pushDevices.findIndex((d) => d.userId === userId && d.deviceToken === deviceToken);
+    if (existingIdx >= 0) {
+      this.pushDevices[existingIdx] = {
+        ...this.pushDevices[existingIdx],
+        platform,
+        updatedAt: now,
+      };
+      return;
+    }
+
+    this.pushDevices.push({
+      id: randomUUID(),
+      userId,
+      deviceToken,
+      platform,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  async getPushDevicesForUsers(userIds: string[]): Promise<PushDevice[]> {
+    const set = new Set(userIds);
+    return this.pushDevices
+      .filter((d) => set.has(d.userId))
+      .map((d) => ({
+        id: d.id,
+        userId: d.userId,
+        deviceToken: d.deviceToken,
+        platform: d.platform as any,
+        createdAt: d.createdAt,
+        updatedAt: d.updatedAt,
+      })) as any;
   }
 }
 

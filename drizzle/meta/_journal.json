@@ -29,6 +29,13 @@
       "when": 1766015812014,
       "tag": "0003_add_superlative_avatar_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1766094486358,
+      "tag": "0004_add_push_devices",
+      "breakpoints": true
     }
   ]
 }
