@@ -54,8 +54,7 @@ export default function CreateClub() {
     // Simulate API call
     setTimeout(() => {
       setIsGenerating(false);
-      toast({
-        title: "Image Generated! ✨",
+      toast("Image Generated! ✨", {
         description: "Your AI-generated cover art is ready.",
       });
       // Set a mock image or leave blank but show success

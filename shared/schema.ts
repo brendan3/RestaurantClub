@@ -46,6 +46,29 @@ export const clubMembers = pgTable("club_members", {
   joinedAt: timestamp("joined_at").defaultNow(),
 });
 
+// ============================================
+// CLUB SUPERLATIVES (HALL OF FAME)
+// ============================================
+
+export const clubSuperlatives = pgTable(
+  "club_superlatives",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    clubId: varchar("club_id").notNull().references(() => clubs.id, { onDelete: "cascade" }),
+    slotKey: text("slot_key").notNull(), // e.g. "slot1", "slot2", "slot3"
+    title: text("title").notNull(),
+    memberName: text("member_name").notNull(),
+    iconKey: text("icon_key").notNull(), // e.g. "utensils" | "mapPin" | "camera"
+    avatarEmoji: text("avatar_emoji"), // optional emoji override
+    avatarImageUrl: text("avatar_image_url"), // optional image URL override
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    uniq: uniqueIndex("club_superlatives_club_slot_unique").on(t.clubId, t.slotKey),
+  })
+);
+
 // Events/Dinners table
 export const events = pgTable("events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -193,6 +216,7 @@ export type WishlistRestaurant = typeof wishlistRestaurants.$inferSelect;
 export type DatePoll = typeof datePolls.$inferSelect;
 export type DatePollOption = typeof datePollOptions.$inferSelect;
 export type DatePollVote = typeof datePollVotes.$inferSelect;
+export type ClubSuperlative = typeof clubSuperlatives.$inferSelect;
 
 export type DatePollWithOptions = {
   poll: DatePoll;

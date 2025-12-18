@@ -2,9 +2,9 @@ import { eq, desc, asc, and, gte, lt, sql } from "drizzle-orm";
 import { db } from "./db"; // <-- FIX 1: Import 'db' directly (not getDb)
 import { 
   users, events, clubs, clubMembers, eventAttendees, eventTags, wishlistRestaurants, eventPhotos,
-  datePolls, datePollOptions, datePollVotes, notifications,
+  datePolls, datePollOptions, datePollVotes, notifications, clubSuperlatives,
   type User, type InsertUser, type Event, type Club, type WishlistRestaurant, type EventPhoto,
-  type DatePoll, type DatePollOption, type DatePollWithOptions, type Notification,
+  type DatePoll, type DatePollOption, type DatePollWithOptions, type Notification, type ClubSuperlative,
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -594,5 +594,47 @@ export class DatabaseStorage implements IStorage {
       pollId: row.pollId || null,
       message: row.message || null,
     })));
+  }
+
+  // Club superlatives
+  async getSuperlativesForClub(clubId: string): Promise<ClubSuperlative[]> {
+    return await db
+      .select()
+      .from(clubSuperlatives)
+      .where(eq(clubSuperlatives.clubId, clubId))
+      .orderBy(asc(clubSuperlatives.slotKey), desc(clubSuperlatives.updatedAt));
+  }
+
+  async upsertSuperlative(
+    clubId: string,
+    input: { slotKey: string; title: string; memberName: string; iconKey: string; avatarEmoji?: string | null; avatarImageUrl?: string | null }
+  ): Promise<ClubSuperlative> {
+    const now = new Date();
+    const res = await db
+      .insert(clubSuperlatives)
+      .values({
+        clubId,
+        slotKey: input.slotKey,
+        title: input.title,
+        memberName: input.memberName,
+        iconKey: input.iconKey,
+        avatarEmoji: input.avatarEmoji ?? null,
+        avatarImageUrl: input.avatarImageUrl ?? null,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [clubSuperlatives.clubId, clubSuperlatives.slotKey],
+        set: {
+          title: input.title,
+          memberName: input.memberName,
+          iconKey: input.iconKey,
+          avatarEmoji: input.avatarEmoji ?? null,
+          avatarImageUrl: input.avatarImageUrl ?? null,
+          updatedAt: now,
+        },
+      })
+      .returning();
+
+    return res[0] as ClubSuperlative;
   }
 }

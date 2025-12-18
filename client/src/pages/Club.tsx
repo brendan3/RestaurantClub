@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
-import { SUPERLATIVES, ASSETS } from "@/lib/mockData";
+import { useEffect, useMemo, useState } from "react";
+import { ASSETS } from "@/lib/mockData";
 import { Link } from "wouter";
-import { Calendar, Clock, Trophy, Crown, Plus, Users as UsersIcon, Copy, Check, Share2, Mail, MessageCircle } from "lucide-react";
+import { Calendar, Clock, Trophy, Crown, Plus, Users as UsersIcon, Copy, Check, Share2, Mail, MessageCircle, MapPin, Camera, UtensilsCrossed, Pencil } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +28,9 @@ import {
   getWishlist,
   updateClub,
   deleteClub,
+  getClubSuperlatives,
+  updateClubSuperlative,
+  type ClubSuperlative,
 } from "@/lib/api";
 import { toast } from "sonner";
 import { useEventModal } from "@/lib/event-modal-context";
@@ -39,6 +42,28 @@ export default function Club() {
   const [wishlist, setWishlist] = useState<WishlistRestaurant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
+
+  // Hall of Fame / superlatives
+  const [superlatives, setSuperlatives] = useState<ClubSuperlative[]>([]);
+  const [isLoadingSuperlatives, setIsLoadingSuperlatives] = useState(false);
+  const [isEditSuperlativeOpen, setIsEditSuperlativeOpen] = useState(false);
+  const [editingSlotKey, setEditingSlotKey] = useState<"slot1" | "slot2" | "slot3" | null>(null);
+  const [superlativeForm, setSuperlativeForm] = useState<{
+    title: string;
+    memberName: string;
+    iconKey: "utensils" | "mapPin" | "camera";
+    avatarMode: "icon" | "emoji" | "image";
+    avatarEmoji: string;
+    avatarImageUrl: string;
+  }>({
+    title: "",
+    memberName: "",
+    iconKey: "utensils",
+    avatarMode: "icon",
+    avatarEmoji: "",
+    avatarImageUrl: "",
+  });
+  const [isSavingSuperlative, setIsSavingSuperlative] = useState(false);
 
   // Date poll state
   const [activePoll, setActivePoll] = useState<ActiveDatePollResponse | null>(null);
@@ -87,6 +112,17 @@ export default function Club() {
       }
 
       if (userClubs.length > 0) {
+        // Load superlatives for the first club
+        setIsLoadingSuperlatives(true);
+        try {
+          const rows = await getClubSuperlatives(userClubs[0].id);
+          setSuperlatives(rows);
+        } catch (e: any) {
+          console.error("Failed to load superlatives:", e);
+        } finally {
+          setIsLoadingSuperlatives(false);
+        }
+
         setIsLoadingPoll(true);
         try {
           const poll = await getActiveDatePoll(userClubs[0].id);
@@ -109,6 +145,82 @@ export default function Club() {
       toast.error(error.message || "Failed to load clubs");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const iconMap = useMemo(() => {
+    return {
+      utensils: UtensilsCrossed,
+      mapPin: MapPin,
+      camera: Camera,
+    } as const;
+  }, []);
+
+  const superlativesBySlot = useMemo(() => {
+    const by = new Map<string, ClubSuperlative>();
+    for (const s of superlatives) by.set(s.slotKey, s);
+    return by;
+  }, [superlatives]);
+
+  const hallOfFameSlots = useMemo(() => {
+    const defaults: Array<{ slotKey: "slot1" | "slot2" | "slot3"; title: string; memberName: string; iconKey: "utensils" | "mapPin" | "camera" }> = [
+      { slotKey: "slot1", title: "The Sauce Collector", memberName: "Tap to edit", iconKey: "utensils" },
+      { slotKey: "slot2", title: "Explorer-in-Chief", memberName: "Tap to edit", iconKey: "mapPin" },
+      { slotKey: "slot3", title: "Recap Photographer", memberName: "Tap to edit", iconKey: "camera" },
+    ];
+
+    return defaults.map((d) => {
+      const existing = superlativesBySlot.get(d.slotKey);
+      return {
+        slotKey: d.slotKey,
+        title: existing?.title ?? d.title,
+        memberName: existing?.memberName ?? d.memberName,
+        iconKey: (existing?.iconKey as any) ?? d.iconKey,
+      };
+    });
+  }, [superlativesBySlot]);
+
+  const openEditSuperlative = (slotKey: "slot1" | "slot2" | "slot3") => {
+    setEditingSlotKey(slotKey);
+    const existing = superlativesBySlot.get(slotKey);
+    setSuperlativeForm({
+      title: existing?.title ?? hallOfFameSlots.find((s) => s.slotKey === slotKey)!.title,
+      memberName: existing?.memberName ?? "",
+      iconKey: (existing?.iconKey as any) ?? (hallOfFameSlots.find((s) => s.slotKey === slotKey)!.iconKey as any),
+      avatarMode: existing?.avatarEmoji ? "emoji" : existing?.avatarImageUrl ? "image" : "icon",
+      avatarEmoji: existing?.avatarEmoji ?? "",
+      avatarImageUrl: existing?.avatarImageUrl ?? "",
+    });
+    setIsEditSuperlativeOpen(true);
+  };
+
+  const handleSaveSuperlative = async () => {
+    if (!clubs[0] || !editingSlotKey) return;
+    if (!superlativeForm.title.trim() || !superlativeForm.memberName.trim()) {
+      toast.error("Title and member name are required");
+      return;
+    }
+
+    setIsSavingSuperlative(true);
+    try {
+      const updated = await updateClubSuperlative(clubs[0].id, editingSlotKey, {
+        title: superlativeForm.title.trim(),
+        memberName: superlativeForm.memberName.trim(),
+        iconKey: superlativeForm.iconKey,
+        avatarEmoji: superlativeForm.avatarMode === "emoji" ? (superlativeForm.avatarEmoji.trim() || null) : null,
+        avatarImageUrl: superlativeForm.avatarMode === "image" ? (superlativeForm.avatarImageUrl.trim() || null) : null,
+      });
+      setSuperlatives((prev) => {
+        const rest = prev.filter((p) => p.slotKey !== updated.slotKey);
+        return [...rest, updated];
+      });
+      toast.success("Hall of Fame updated");
+      setIsEditSuperlativeOpen(false);
+      setEditingSlotKey(null);
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to update Hall of Fame");
+    } finally {
+      setIsSavingSuperlative(false);
     }
   };
 
@@ -320,7 +432,7 @@ Sign up at the app and enter the code to join!`;
       <div className="text-center max-w-2xl mx-auto space-y-4">
         <img src={ASSETS.mascot} alt="Mascot" className="w-24 h-24 mx-auto object-contain animate-bounce-slow" />
         <div className="flex items-center justify-center gap-2 flex-wrap">
-        <h1 className="text-3xl md:text-4xl font-heading font-bold text-foreground">{club.name}</h1>
+          <h1 className="text-3xl md:text-4xl font-heading font-bold text-foreground">{club.name}</h1>
           {isOwner && (
             <Button
               size="sm"
@@ -347,26 +459,34 @@ Sign up at the app and enter the code to join!`;
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {club.membersList.map((member) => (
-              <div key={member.id} className="flex items-center justify-between p-3 hover:bg-muted/50 rounded-xl transition-colors">
-                <div className="flex items-center gap-3">
-                  <Avatar className="w-12 h-12 border-2 border-background shadow-sm">
-                    <AvatarImage src={member.avatar || undefined} />
-                    <AvatarFallback>{member.name[0]}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-bold text-foreground">{member.name}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{member.role || 'Member'}</p>
+            {club.membersList.map((member) => {
+              const href = member.id === user?.id ? "/profile" : `/members/${member.id}`;
+              return (
+                <Link
+                  key={member.id}
+                  href={href}
+                  className="flex items-center justify-between p-3 hover:bg-muted/50 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  aria-label={`View ${member.name}'s profile`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Avatar className="w-12 h-12 border-2 border-background shadow-sm">
+                      <AvatarImage src={member.avatar || undefined} />
+                      <AvatarFallback>{member.name[0]}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-bold text-foreground">{member.name}</p>
+                      <p className="text-xs text-muted-foreground capitalize">{member.role || 'Member'}</p>
+                    </div>
                   </div>
-                </div>
-                {member.role === "owner" && (
-                  <Badge className="bg-primary/10 text-primary hover:bg-primary/20 border-none">
-                    <Crown className="w-3 h-3 mr-1" />
-                    Owner
-                  </Badge>
-                )}
-              </div>
-            ))}
+                  {member.role === "owner" && (
+                    <Badge className="bg-primary/10 text-primary hover:bg-primary/20 border-none">
+                      <Crown className="w-3 h-3 mr-1" />
+                      Owner
+                    </Badge>
+                  )}
+                </Link>
+              );
+            })}
             <Button 
               variant="outline" 
               className="w-full mt-4 border-dashed border-2 h-12 text-muted-foreground hover:text-primary hover:border-primary hover:bg-primary/5"
@@ -386,21 +506,147 @@ Sign up at the app and enter the code to join!`;
             </CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4">
-            {SUPERLATIVES.map((award, i) => (
-              <div key={i} className="bg-card/80 backdrop-blur-sm p-4 rounded-xl border shadow-sm flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600 shrink-0">
-                  <award.icon className="w-5 h-5" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs text-muted-foreground font-bold uppercase tracking-wide">{award.title}</p>
-                  <p className="font-bold text-lg text-foreground">{award.winner}</p>
-                </div>
-                <Crown className="w-5 h-5 text-yellow-400 opacity-20" />
-              </div>
-            ))}
+            {isLoadingSuperlatives ? (
+              <div className="text-sm text-muted-foreground text-center py-6">Loading Hall of Fame…</div>
+            ) : (
+              hallOfFameSlots.map((slot) => {
+                const Icon = iconMap[slot.iconKey as "utensils" | "mapPin" | "camera"] ?? Trophy;
+                const existing = superlativesBySlot.get(slot.slotKey);
+                const emoji = existing?.avatarEmoji ?? null;
+                const imageUrl = existing?.avatarImageUrl ?? null;
+                return (
+                  <button
+                    key={slot.slotKey}
+                    type="button"
+                    onClick={() => openEditSuperlative(slot.slotKey)}
+                    className="bg-card/80 backdrop-blur-sm p-4 rounded-xl border shadow-sm flex items-center gap-4 hover:bg-card transition-colors text-left"
+                    aria-label={`Edit Hall of Fame: ${slot.title}`}
+                  >
+                    <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600 shrink-0">
+                      {imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt=""
+                          className="w-10 h-10 object-cover rounded-full"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                      ) : emoji ? (
+                        <span className="text-lg">{emoji}</span>
+                      ) : (
+                        <Icon className="w-5 h-5" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-muted-foreground font-bold uppercase tracking-wide">{slot.title}</p>
+                      <p className="font-bold text-lg text-foreground">{slot.memberName}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Pencil className="w-4 h-4 text-muted-foreground" />
+                      <Crown className="w-5 h-5 text-yellow-400 opacity-20" />
+                    </div>
+                  </button>
+                );
+              })
+            )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Edit Hall of Fame Modal */}
+      <Dialog open={isEditSuperlativeOpen} onOpenChange={setIsEditSuperlativeOpen}>
+        <DialogContent className="sm:max-w-[450px] rounded-[1.25rem]">
+          <DialogHeader>
+            <DialogTitle>Edit Hall of Fame</DialogTitle>
+            <DialogDescription>Update this superlative for your club.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Category title</label>
+              <input
+                type="text"
+                value={superlativeForm.title}
+                onChange={(e) => setSuperlativeForm((p) => ({ ...p, title: e.target.value }))}
+                className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="e.g. The Sauce Collector"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Member name</label>
+              <input
+                type="text"
+                value={superlativeForm.memberName}
+                onChange={(e) => setSuperlativeForm((p) => ({ ...p, memberName: e.target.value }))}
+                className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="e.g. Alex"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Icon</label>
+              <select
+                value={superlativeForm.iconKey}
+                onChange={(e) => setSuperlativeForm((p) => ({ ...p, iconKey: e.target.value as any }))}
+                className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="utensils">Utensils</option>
+                <option value="mapPin">Map Pin</option>
+                <option value="camera">Camera</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Avatar type</label>
+              <select
+                value={superlativeForm.avatarMode}
+                onChange={(e) => setSuperlativeForm((p) => ({ ...p, avatarMode: e.target.value as any }))}
+                className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="icon">Icon</option>
+                <option value="emoji">Emoji</option>
+                <option value="image">Image URL</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Icon is the default. Emoji or Image URL will override the icon.
+              </p>
+            </div>
+
+            {superlativeForm.avatarMode === "emoji" && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Emoji</label>
+                <input
+                  type="text"
+                  value={superlativeForm.avatarEmoji}
+                  onChange={(e) => setSuperlativeForm((p) => ({ ...p, avatarEmoji: e.target.value }))}
+                  className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="e.g. 🍝"
+                />
+              </div>
+            )}
+
+            {superlativeForm.avatarMode === "image" && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Image URL</label>
+                <input
+                  type="url"
+                  value={superlativeForm.avatarImageUrl}
+                  onChange={(e) => setSuperlativeForm((p) => ({ ...p, avatarImageUrl: e.target.value }))}
+                  className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="https://example.com/avatar.jpg"
+                />
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="ghost" onClick={() => setIsEditSuperlativeOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveSuperlative} disabled={isSavingSuperlative}>
+              {isSavingSuperlative ? "Saving..." : "Save"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Date Polls */}
       <div className="space-y-4">

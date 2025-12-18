@@ -65,6 +65,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get current user (protected)
   app.get("/api/user/me", auth.requireAuth, auth.getCurrentUser);
 
+  // Get a user by ID (safe fields only)
+  app.get("/api/users/:id", auth.requireAuth, async (req, res) => {
+    try {
+      const targetId = req.params.id;
+      const found = await storage.getUser(targetId);
+      if (!found) return res.status(404).json({ error: "User not found" });
+
+      // Return only safe, non-sensitive fields
+      res.json({
+        id: found.id,
+        name: found.name,
+        avatar: found.avatar,
+        email: found.email,
+        memberSince: found.memberSince,
+      });
+    } catch (err) {
+      console.error("Error fetching user by id:", err);
+      res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
   // Update current user profile (name, avatar)
   app.patch("/api/user/me", auth.requireAuth, async (req, res) => {
     try {
@@ -174,6 +195,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================
   // CLUB ENDPOINTS
   // ============================================
+
+  // Club superlatives (Hall of Fame)
+  const ALLOWED_SUPERLATIVE_ICON_KEYS = ["utensils", "mapPin", "camera"] as const;
+  const ALLOWED_SUPERLATIVE_SLOT_KEYS = ["slot1", "slot2", "slot3"] as const;
+
+  app.get("/api/clubs/:clubId/superlatives", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.json([]);
+    }
+
+    try {
+      const clubId = req.params.clubId;
+      const isMember = await storage.isUserInClub(req.user!.id, clubId);
+      if (!isMember) return res.status(403).json({ error: "You must be a member of this club" });
+
+      const rows = await storage.getSuperlativesForClub(clubId);
+      res.json(rows.slice(0, 3));
+    } catch (err) {
+      console.error("Error fetching superlatives:", err);
+      res.status(500).json({ error: "Failed to fetch superlatives" });
+    }
+  });
+
+  app.post("/api/clubs/:clubId/superlatives/:slotKey", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.status(501).json({ error: "Not available in mock mode" });
+    }
+
+    try {
+      const clubId = req.params.clubId;
+      const slotKey = req.params.slotKey;
+      const { title, memberName, iconKey, avatarEmoji, avatarImageUrl } = req.body as {
+        title?: string;
+        memberName?: string;
+        iconKey?: string;
+        avatarEmoji?: string | null;
+        avatarImageUrl?: string | null;
+      };
+
+      const isMember = await storage.isUserInClub(req.user!.id, clubId);
+      if (!isMember) return res.status(403).json({ error: "You must be a member of this club" });
+
+      if (!ALLOWED_SUPERLATIVE_SLOT_KEYS.includes(slotKey as any)) {
+        return res.status(400).json({ error: "Invalid slotKey" });
+      }
+      if (!title || typeof title !== "string" || !title.trim()) {
+        return res.status(400).json({ error: "title is required" });
+      }
+      if (!memberName || typeof memberName !== "string" || !memberName.trim()) {
+        return res.status(400).json({ error: "memberName is required" });
+      }
+      if (!iconKey || typeof iconKey !== "string" || !ALLOWED_SUPERLATIVE_ICON_KEYS.includes(iconKey as any)) {
+        return res.status(400).json({ error: "iconKey is invalid" });
+      }
+
+      const emojiVal = avatarEmoji === null || avatarEmoji === undefined ? null : String(avatarEmoji).trim();
+      const imageVal = avatarImageUrl === null || avatarImageUrl === undefined ? null : String(avatarImageUrl).trim();
+      if (emojiVal && imageVal) {
+        return res.status(400).json({ error: "Provide either avatarEmoji or avatarImageUrl, not both" });
+      }
+      if (imageVal && !/^https?:\/\//i.test(imageVal)) {
+        return res.status(400).json({ error: "avatarImageUrl must be a valid http(s) URL" });
+      }
+      if (emojiVal && emojiVal.length > 16) {
+        return res.status(400).json({ error: "avatarEmoji is too long" });
+      }
+
+      const updated = await storage.upsertSuperlative(clubId, {
+        slotKey,
+        title: title.trim(),
+        memberName: memberName.trim(),
+        iconKey,
+        avatarEmoji: emojiVal,
+        avatarImageUrl: imageVal,
+      });
+      res.json(updated);
+    } catch (err) {
+      console.error("Error upserting superlative:", err);
+      res.status(500).json({ error: "Failed to update superlative" });
+    }
+  });
   
   // Get user's clubs
   app.get("/api/clubs/me", auth.requireAuth, async (req, res) => {

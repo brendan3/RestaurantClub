@@ -216,6 +216,54 @@ export async function getCurrentUser(): Promise<User> {
 }
 
 // ============================================
+// USER LOOKUP
+// ============================================
+
+export interface PublicUser {
+  id: string;
+  name: string;
+  avatar?: string | null;
+  email: string;
+  memberSince: string;
+}
+
+export async function getUserById(userId: string): Promise<PublicUser> {
+  return apiRequest<PublicUser>(`/api/users/${userId}`);
+}
+
+// ============================================
+// CLUB SUPERLATIVES (HALL OF FAME)
+// ============================================
+
+export interface ClubSuperlative {
+  id: string;
+  clubId: string;
+  slotKey: string;
+  title: string;
+  memberName: string;
+  iconKey: string;
+  avatarEmoji?: string | null;
+  avatarImageUrl?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function getClubSuperlatives(clubId: string): Promise<ClubSuperlative[]> {
+  return apiRequest<ClubSuperlative[]>(`/api/clubs/${clubId}/superlatives`);
+}
+
+export async function updateClubSuperlative(
+  clubId: string,
+  slotKey: string,
+  data: { title: string; memberName: string; iconKey: string; avatarEmoji?: string | null; avatarImageUrl?: string | null }
+): Promise<ClubSuperlative> {
+  return apiRequest<ClubSuperlative>(`/api/clubs/${clubId}/superlatives/${slotKey}`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+// ============================================
 // CLUB FUNCTIONS
 // ============================================
 

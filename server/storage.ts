@@ -9,6 +9,7 @@ import {
   type DatePollOption,
   type DatePollWithOptions,
   type Notification,
+  type ClubSuperlative,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -122,13 +123,22 @@ export interface IStorage {
     pollId?: string;
     message?: string;
   }>): Promise<void>;
+
+  // Club superlatives (Hall of Fame)
+  getSuperlativesForClub(clubId: string): Promise<ClubSuperlative[]>;
+  upsertSuperlative(
+    clubId: string,
+    input: { slotKey: string; title: string; memberName: string; iconKey: string; avatarEmoji?: string | null; avatarImageUrl?: string | null }
+  ): Promise<ClubSuperlative>;
 }
 
 export class MemStorage implements IStorage {
   private users: Map<string, User>;
+  private superlativesByClub: Map<string, Map<string, ClubSuperlative>>;
 
   constructor() {
     this.users = new Map();
+    this.superlativesByClub = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -380,6 +390,42 @@ export class MemStorage implements IStorage {
 
   async createNotifications(): Promise<void> {
     // No-op
+  }
+
+  // Club superlatives
+  async getSuperlativesForClub(clubId: string): Promise<ClubSuperlative[]> {
+    const clubMap = this.superlativesByClub.get(clubId);
+    if (!clubMap) return [];
+    return Array.from(clubMap.values());
+  }
+
+  async upsertSuperlative(
+    clubId: string,
+    input: { slotKey: string; title: string; memberName: string; iconKey: string; avatarEmoji?: string | null; avatarImageUrl?: string | null }
+  ): Promise<ClubSuperlative> {
+    let clubMap = this.superlativesByClub.get(clubId);
+    if (!clubMap) {
+      clubMap = new Map();
+      this.superlativesByClub.set(clubId, clubMap);
+    }
+
+    const existing = clubMap.get(input.slotKey);
+    const now = new Date();
+    const row: ClubSuperlative = {
+      id: existing?.id ?? randomUUID(),
+      clubId,
+      slotKey: input.slotKey,
+      title: input.title,
+      memberName: input.memberName,
+      iconKey: input.iconKey,
+      avatarEmoji: input.avatarEmoji ?? null,
+      avatarImageUrl: input.avatarImageUrl ?? null,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    } as any;
+
+    clubMap.set(input.slotKey, row);
+    return row;
   }
 }
 

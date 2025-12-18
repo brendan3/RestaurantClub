@@ -1,4 +1,5 @@
 import { Switch, Route, Redirect, useLocation } from "wouter";
+import type { ComponentType } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
@@ -18,7 +19,7 @@ import VerifyEmail from "@/pages/VerifyEmail";
 import Join from "@/pages/Join";
 import AppShell from "@/components/layout/AppShell";
 
-function ProtectedRoute({ component: Component }: { component: () => JSX.Element }) {
+function ProtectedRoute({ component: Component }: { component: ComponentType }) {
   const { isAuthenticated, isLoading } = useAuth();
   const [location] = useLocation();
 
@@ -99,6 +100,14 @@ function Router() {
         <AppShell>
           <ProtectedRoute component={Profile} />
         </AppShell>
+      </Route>
+
+      <Route path="/members/:userId">
+        {(params) => (
+          <AppShell>
+            <ProtectedRoute component={() => <Profile userId={params.userId} />} />
+          </AppShell>
+        )}
       </Route>
       
       <Route path="/event/:id">

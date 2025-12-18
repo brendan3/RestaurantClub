@@ -13,15 +13,19 @@ import {
 } from "@/components/ui/dialog";
 import { Settings, Award, Star, LogOut, Users, User, Bell, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { logout, getUserClubs, getWishlist, removeFromWishlist, updateUserProfile, uploadUserAvatar, type Club, type WishlistRestaurant } from "@/lib/api";
+import { logout, getUserClubs, getWishlist, removeFromWishlist, updateUserProfile, uploadUserAvatar, getUserById, type Club, type WishlistRestaurant, type PublicUser } from "@/lib/api";
 import { toast } from "sonner";
 import { Trash2, Heart } from "lucide-react";
 
-export default function Profile() {
+export default function Profile({ userId }: { userId?: string }) {
   const { user, setUser } = useAuth();
   const [, setLocation] = useLocation();
+  const isSelf = !userId || userId === user?.id;
+  const [viewedUser, setViewedUser] = useState<PublicUser | null>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [isAvatarLightboxOpen, setIsAvatarLightboxOpen] = useState(false);
   const [userClubs, setUserClubs] = useState<Club[]>([]);
   const [wishlist, setWishlist] = useState<WishlistRestaurant[]>([]);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -42,18 +46,50 @@ export default function Profile() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [clubs, wishlistData] = await Promise.all([
-          getUserClubs(),
-          getWishlist(),
-        ]);
-        setUserClubs(clubs);
-        setWishlist(wishlistData);
+        if (isSelf) {
+          const [clubs, wishlistData] = await Promise.all([getUserClubs(), getWishlist()]);
+          setUserClubs(clubs);
+          setWishlist(wishlistData);
+        } else {
+          setUserClubs([]);
+          setWishlist([]);
+        }
       } catch (error) {
         // Silently fail
       }
     };
     loadData();
-  }, []);
+  }, [isSelf]);
+
+  useEffect(() => {
+    // Keep form in sync with authed user (self only)
+    if (!isSelf) return;
+    setProfileForm({
+      name: user?.name ?? "",
+      avatar: user?.avatar ?? "",
+    });
+  }, [isSelf, user?.name, user?.avatar]);
+
+  useEffect(() => {
+    const loadViewedUser = async () => {
+      if (isSelf) {
+        setViewedUser(null);
+        return;
+      }
+      if (!userId) return;
+      try {
+        setIsLoadingProfile(true);
+        const u = await getUserById(userId);
+        setViewedUser(u);
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to load member profile");
+        setViewedUser(null);
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+    loadViewedUser();
+  }, [isSelf, userId]);
 
   const handleRemoveFromWishlist = async (id: string) => {
     try {
@@ -113,6 +149,7 @@ export default function Profile() {
   };
 
   const openEditProfile = () => {
+    if (!isSelf) return;
     setProfileForm({
       name: user?.name ?? "",
       avatar: user?.avatar ?? "",
@@ -126,27 +163,46 @@ export default function Profile() {
   if (!user) {
     return null;
   }
+  const displayUser = (isSelf ? user : viewedUser) as any;
+  if (!isSelf && isLoadingProfile) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="text-sm text-muted-foreground">Loading profile…</div>
+      </div>
+    );
+  }
+  if (!displayUser) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="text-sm text-muted-foreground">Member not found.</div>
+      </div>
+    );
+  }
+
+  const avatarUrl: string | null = displayUser.avatar || null;
   return (
     <div className="max-w-2xl mx-auto space-y-8">
       <div className="text-center space-y-4">
         <button
           type="button"
-          onClick={openEditProfile}
+          onClick={() => {
+            if (avatarUrl) setIsAvatarLightboxOpen(true);
+          }}
           className="group inline-flex items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-primary/40"
-          aria-label="Edit profile"
+          aria-label={avatarUrl ? "View profile photo" : "Profile photo"}
         >
           <Avatar className="w-32 h-32 mx-auto border-4 border-background shadow-xl transition-transform group-hover:scale-[1.02]">
-          <AvatarImage src={user.avatar || undefined} />
-          <AvatarFallback>{user.name[0]}</AvatarFallback>
+          <AvatarImage src={avatarUrl || undefined} />
+          <AvatarFallback>{displayUser.name?.[0] ?? "?"}</AvatarFallback>
         </Avatar>
         </button>
         <div>
-          <h1 className="text-3xl font-heading font-bold">{user.name}</h1>
+          <h1 className="text-3xl font-heading font-bold">{displayUser.name}</h1>
           <p className="text-muted-foreground">
-            {user.email}
+            {displayUser.email}
           </p>
           <p className="text-xs text-muted-foreground">
-            Member since {new Date(user.memberSince).getFullYear()}
+            Member since {new Date(displayUser.memberSince).getFullYear()}
           </p>
         </div>
       </div>
@@ -155,7 +211,7 @@ export default function Profile() {
          <Card className="text-center border-none shadow-sm bg-primary/5">
             <CardContent className="pt-6">
               <span className="block text-3xl font-bold text-primary">
-                {user.stats?.attendance || 0}%
+                {(isSelf ? user.stats?.attendance : 0) || 0}%
               </span>
               <span className="text-xs text-muted-foreground font-medium uppercase">Attendance</span>
             </CardContent>
@@ -163,7 +219,7 @@ export default function Profile() {
          <Card className="text-center border-none shadow-sm bg-secondary/20">
             <CardContent className="pt-6">
               <span className="block text-3xl font-bold text-secondary-foreground">
-                {user.stats?.avgRating || 0}
+                {(isSelf ? user.stats?.avgRating : 0) || 0}
               </span>
               <span className="text-xs text-muted-foreground font-medium uppercase">Avg Rating</span>
             </CardContent>
@@ -185,6 +241,7 @@ export default function Profile() {
          </Button>
       </div>
 
+      {isSelf && (
       <Card className="border-none shadow-soft">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -217,12 +274,13 @@ export default function Profile() {
           )}
         </CardContent>
       </Card>
+      )}
 
       <Card className="border-none shadow-soft">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
              <Award className="w-5 h-5 text-primary" />
-             My Awards
+             {isSelf ? "My Awards" : "Awards"}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -236,22 +294,41 @@ export default function Profile() {
         </CardContent>
       </Card>
 
-      <div className="space-y-2">
-        <Button 
-          variant="outline" 
-          className="w-full justify-start h-12"
-          onClick={() => setIsSettingsOpen(true)}
-        >
-          <Settings className="w-4 h-4 mr-2" /> Settings
-        </Button>
-        <Button 
-          onClick={handleLogout}
-          variant="ghost" 
-          className="w-full justify-start h-12 text-destructive hover:text-destructive hover:bg-destructive/10"
-        >
-          <LogOut className="w-4 h-4 mr-2" /> Sign Out
-        </Button>
-      </div>
+      {isSelf && (
+        <div className="space-y-2">
+          <Button 
+            variant="outline" 
+            className="w-full justify-start h-12"
+            onClick={() => setIsSettingsOpen(true)}
+          >
+            <Settings className="w-4 h-4 mr-2" /> Settings
+          </Button>
+          <Button 
+            onClick={handleLogout}
+            variant="ghost" 
+            className="w-full justify-start h-12 text-destructive hover:text-destructive hover:bg-destructive/10"
+          >
+            <LogOut className="w-4 h-4 mr-2" /> Sign Out
+          </Button>
+        </div>
+      )}
+
+      {/* Avatar Lightbox */}
+      <Dialog open={isAvatarLightboxOpen} onOpenChange={setIsAvatarLightboxOpen}>
+        <DialogContent className="max-w-2xl w-full bg-black/95 border-none p-0 rounded-2xl">
+          {avatarUrl ? (
+            <div className="p-6 flex items-center justify-center">
+              <img
+                src={avatarUrl}
+                alt={`${displayUser.name} avatar`}
+                className="max-h-[80vh] w-auto object-contain rounded-xl"
+              />
+            </div>
+          ) : (
+            <div className="p-10 text-center text-sm text-white/80">No photo available</div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Settings Modal */}
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
