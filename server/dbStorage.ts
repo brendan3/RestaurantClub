@@ -3,8 +3,10 @@ import { db } from "./db"; // <-- FIX 1: Import 'db' directly (not getDb)
 import { 
   users, events, clubs, clubMembers, eventAttendees, eventTags, wishlistRestaurants, eventPhotos,
   datePolls, datePollOptions, datePollVotes, notifications, clubSuperlatives, pushDevices,
+  photoComments, eventReviews,
   type User, type InsertUser, type Event, type Club, type WishlistRestaurant, type EventPhoto,
   type DatePoll, type DatePollOption, type DatePollWithOptions, type Notification, type ClubSuperlative, type PushDevice,
+  type PhotoComment, type EventReview,
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -434,6 +436,148 @@ export class DatabaseStorage implements IStorage {
 
   async deleteEventPhoto(photoId: string, _userId?: string): Promise<void> {
     await db.delete(eventPhotos).where(eq(eventPhotos.id, photoId));
+  }
+  
+  async getPhotoFeed(userId: string, opts?: { limit?: number; offset?: number }): Promise<Array<{
+    photo: EventPhoto;
+    event: Event;
+    club: Club;
+    user: User;
+    commentCount: number;
+  }>> {
+    const limit = opts?.limit ?? 10;
+    const offset = opts?.offset ?? 0;
+    
+    // Get user's clubs
+    const userClubs = await db
+      .select({ clubId: clubs.id })
+      .from(clubs)
+      .innerJoin(clubMembers, eq(clubs.id, clubMembers.clubId))
+      .where(eq(clubMembers.userId, userId));
+    
+    if (userClubs.length === 0) {
+      return [];
+    }
+    
+    const clubIds = userClubs.map(c => c.clubId);
+    
+    // Get photos from events in user's clubs, ordered by most recent first
+    const photos = await db
+      .select({
+        photo: eventPhotos,
+        event: events,
+        club: clubs,
+        user: users,
+      })
+      .from(eventPhotos)
+      .innerJoin(events, eq(eventPhotos.eventId, events.id))
+      .innerJoin(clubs, eq(events.clubId, clubs.id))
+      .innerJoin(users, eq(eventPhotos.userId, users.id))
+      .where(inArray(events.clubId, clubIds))
+      .orderBy(desc(eventPhotos.createdAt), desc(eventPhotos.id))
+      .limit(limit)
+      .offset(offset);
+    
+    // Get comment counts for each photo
+    const photoIds = photos.map(p => p.photo.id);
+    const commentCounts = photoIds.length > 0
+      ? await db
+          .select({
+            photoId: photoComments.photoId,
+            count: sql<number>`count(*)::int`,
+          })
+          .from(photoComments)
+          .where(inArray(photoComments.photoId, photoIds))
+          .groupBy(photoComments.photoId)
+      : [];
+    
+    const countMap = new Map(commentCounts.map(c => [c.photoId, c.count]));
+    
+    return photos.map(p => ({
+      photo: p.photo,
+      event: p.event,
+      club: p.club,
+      user: p.user,
+      commentCount: countMap.get(p.photo.id) ?? 0,
+    }));
+  }
+  
+  async getPhotoComments(photoId: string): Promise<Array<PhotoComment & { user: User }>> {
+    const comments = await db
+      .select({
+        comment: photoComments,
+        user: users,
+      })
+      .from(photoComments)
+      .innerJoin(users, eq(photoComments.userId, users.id))
+      .where(eq(photoComments.photoId, photoId))
+      .orderBy(asc(photoComments.createdAt));
+    
+    return comments.map(c => ({
+      ...c.comment,
+      user: c.user,
+    }));
+  }
+  
+  async addPhotoComment(photoId: string, userId: string, text: string): Promise<PhotoComment> {
+    const result = await db
+      .insert(photoComments)
+      .values({
+        photoId,
+        userId,
+        text: text.trim(),
+      })
+      .returning();
+    return result[0];
+  }
+  
+  async getEventReviews(eventId: string): Promise<Array<EventReview & { user: User }>> {
+    const reviews = await db
+      .select({
+        review: eventReviews,
+        user: users,
+      })
+      .from(eventReviews)
+      .innerJoin(users, eq(eventReviews.userId, users.id))
+      .where(eq(eventReviews.eventId, eventId))
+      .orderBy(desc(eventReviews.createdAt));
+    
+    return reviews.map(r => ({
+      ...r.review,
+      user: r.user,
+    }));
+  }
+  
+  async getEventReviewByUser(eventId: string, userId: string): Promise<EventReview | undefined> {
+    const result = await db
+      .select()
+      .from(eventReviews)
+      .where(and(eq(eventReviews.eventId, eventId), eq(eventReviews.userId, userId)))
+      .limit(1);
+    return result[0];
+  }
+  
+  async upsertEventReview(eventId: string, userId: string, rating: number, text?: string | null): Promise<EventReview> {
+    const now = new Date();
+    const result = await db
+      .insert(eventReviews)
+      .values({
+        eventId,
+        userId,
+        rating,
+        text: text?.trim() || null,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [eventReviews.userId, eventReviews.eventId],
+        set: {
+          rating,
+          text: text?.trim() || null,
+          updatedAt: now,
+        },
+      })
+      .returning();
+    return result[0];
   }
 
   // ============================================

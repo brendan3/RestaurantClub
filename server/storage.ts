@@ -11,6 +11,8 @@ import {
   type Notification,
   type ClubSuperlative,
   type PushDevice,
+  type PhotoComment,
+  type EventReview,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -96,6 +98,24 @@ export interface IStorage {
     caption?: string | null;
     order?: number | null;
   }): Promise<EventPhoto>;
+  
+  // Photo feed (for social page)
+  getPhotoFeed(userId: string, opts?: { limit?: number; offset?: number }): Promise<Array<{
+    photo: EventPhoto;
+    event: Event;
+    club: Club;
+    user: User;
+    commentCount: number;
+  }>>;
+  
+  // Photo comments
+  getPhotoComments(photoId: string): Promise<Array<PhotoComment & { user: User }>>;
+  addPhotoComment(photoId: string, userId: string, text: string): Promise<PhotoComment>;
+  
+  // Event reviews
+  getEventReviews(eventId: string): Promise<Array<EventReview & { user: User }>>;
+  getEventReviewByUser(eventId: string, userId: string): Promise<EventReview | undefined>;
+  upsertEventReview(eventId: string, userId: string, rating: number, text?: string | null): Promise<EventReview>;
   deleteEventPhoto(photoId: string, userId: string): Promise<void>;
 
   // Date poll methods
@@ -361,6 +381,30 @@ export class MemStorage implements IStorage {
   }
 
   async deleteEventPhoto(): Promise<void> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  
+  async getPhotoFeed(): Promise<any[]> {
+    return [];
+  }
+  
+  async getPhotoComments(): Promise<any[]> {
+    return [];
+  }
+  
+  async addPhotoComment(): Promise<any> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  
+  async getEventReviews(): Promise<any[]> {
+    return [];
+  }
+  
+  async getEventReviewByUser(): Promise<any> {
+    return undefined;
+  }
+  
+  async upsertEventReview(): Promise<any> {
     throw new Error("Not implemented in MemStorage");
   }
 

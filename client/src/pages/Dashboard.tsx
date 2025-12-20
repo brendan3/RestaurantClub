@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { ASSETS } from "@/lib/mockData";
-import { Calendar, Clock, MapPin, MessageSquare, Heart, Share2, ChefHat, Check, X, Plus, ExternalLink, Copy, Mail, MessageCircle as MessageCircleIcon, Utensils, CheckCircle2, History } from "lucide-react";
+import { Calendar, Clock, MapPin, MessageSquare, Heart, Share2, ChefHat, Check, X, Plus, ExternalLink, Copy, Mail, MessageCircle as MessageCircleIcon, Utensils, CheckCircle2, History, Star } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -13,10 +13,11 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useEventModal } from "@/lib/event-modal-context";
-import { getUpcomingEvents, getPastEvents, getUserRsvp, rsvpToEvent, getEventRsvps, getUserClubs, getWishlist, removeFromWishlist, getEventImageUrl, searchNearbyRestaurants, getRestaurantPhotoUrl, type Event, type Club, type WishlistRestaurant, type NearbyPlace } from "@/lib/api";
+import { getUpcomingEvents, getPastEvents, getUserRsvp, rsvpToEvent, getEventRsvps, getUserClubs, getWishlist, removeFromWishlist, getEventImageUrl, searchNearbyRestaurants, getRestaurantPhotoUrl, postEventReview, type Event, type Club, type WishlistRestaurant, type NearbyPlace } from "@/lib/api";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 
@@ -100,6 +101,13 @@ export default function Dashboard() {
   // Photo gallery state
   const [galleryPlace, setGalleryPlace] = useState<NearbyPlace | null>(null);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+
+  // Review modal state
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [selectedEventForReview, setSelectedEventForReview] = useState<Event | null>(null);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewText, setReviewText] = useState("");
+  const [isPostingReview, setIsPostingReview] = useState(false);
 
   // Current event based on index
   const upcomingEvent = upcomingEvents.length > 0 ? upcomingEvents[currentIndex] : null;
@@ -547,11 +555,12 @@ Sign up at the app and enter the code to join!`;
             Create Event
           </Button>
                 <Button
-                  asChild
                   variant="outline"
                   className="rounded-full font-bold bg-white shadow-sm border border-white/50 text-foreground hover:bg-primary/10 hover:text-primary transition-all"
+                  onClick={() => setIsReviewModalOpen(true)}
                 >
-                  <Link href="/join">Join with Code</Link>
+                  <Star className="w-4 h-4 mr-2" />
+                  Post a Review
                 </Button>
               </>
             ) : (
@@ -994,6 +1003,135 @@ Sign up at the app and enter the code to join!`;
           </div>
         </div>
       </div>
+
+      {/* Post Review Modal */}
+      <Dialog open={isReviewModalOpen} onOpenChange={setIsReviewModalOpen}>
+        <DialogContent className="sm:max-w-[600px] rounded-[1.25rem] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Post a Review</DialogTitle>
+            <DialogDescription>
+              Select an event and share your experience
+            </DialogDescription>
+          </DialogHeader>
+          
+          {!selectedEventForReview ? (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">Choose an event to review:</p>
+              {pastEvents.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No past events to review yet.
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                  {pastEvents.map((event) => (
+                    <button
+                      key={event.id}
+                      onClick={() => setSelectedEventForReview(event)}
+                      className="w-full text-left p-4 rounded-xl border hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-bold">{event.restaurantName}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(event.eventDate).toLocaleDateString('en-US', {
+                              weekday: 'long',
+                              month: 'long',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })}
+                          </p>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="p-4 bg-muted/50 rounded-xl">
+                <p className="font-bold">{selectedEventForReview.restaurantName}</p>
+                <p className="text-sm text-muted-foreground">
+                  {new Date(selectedEventForReview.eventDate).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })}
+                </p>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium mb-2 block">Rating</label>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map((rating) => (
+                    <button
+                      key={rating}
+                      type="button"
+                      onClick={() => setReviewRating(rating)}
+                      className={`p-3 rounded-lg transition-colors ${
+                        reviewRating >= rating
+                          ? "bg-yellow-100 text-yellow-600"
+                          : "bg-muted text-muted-foreground hover:bg-muted/80"
+                      }`}
+                    >
+                      <Star className={`w-6 h-6 ${reviewRating >= rating ? "fill-current" : ""}`} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium mb-2 block">Review (optional)</label>
+                <Textarea
+                  value={reviewText}
+                  onChange={(e) => setReviewText(e.target.value)}
+                  placeholder="Share your thoughts about the food, service, atmosphere..."
+                  className="min-h-[100px]"
+                />
+              </div>
+              
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setSelectedEventForReview(null);
+                    setReviewRating(0);
+                    setReviewText("");
+                  }}
+                >
+                  Back
+                </Button>
+                <Button
+                  onClick={async () => {
+                    if (reviewRating === 0) {
+                      toast.error("Please select a rating");
+                      return;
+                    }
+                    setIsPostingReview(true);
+                    try {
+                      await postEventReview(selectedEventForReview.id, reviewRating, reviewText || undefined);
+                      toast.success("Review posted!");
+                      setIsReviewModalOpen(false);
+                      setSelectedEventForReview(null);
+                      setReviewRating(0);
+                      setReviewText("");
+                    } catch (error: any) {
+                      toast.error(error.message || "Failed to post review");
+                    } finally {
+                      setIsPostingReview(false);
+                    }
+                  }}
+                  disabled={reviewRating === 0 || isPostingReview}
+                >
+                  {isPostingReview ? "Posting..." : "Post Review"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

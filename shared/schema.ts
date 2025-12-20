@@ -118,6 +118,29 @@ export const eventPhotos = pgTable("event_photos", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Photo comments
+export const photoComments = pgTable("photo_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  photoId: varchar("photo_id").notNull().references(() => eventPhotos.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  text: text("text").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Event reviews (restaurant reviews after event)
+export const eventReviews = pgTable("event_reviews", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  rating: integer("rating").notNull(), // 1-5 stars
+  text: text("text"), // Optional review text
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  // One review per user per event
+  uniq: uniqueIndex("event_reviews_user_event_unique").on(t.userId, t.eventId),
+}));
+
 // Wishlist restaurants (user-scoped)
 export const wishlistRestaurants = pgTable("wishlist_restaurants", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -211,6 +234,12 @@ export type Event = typeof events.$inferSelect;
 
 export type EventPhoto = typeof eventPhotos.$inferSelect;
 export type InsertEventPhoto = typeof eventPhotos.$inferInsert;
+
+export type PhotoComment = typeof photoComments.$inferSelect;
+export type InsertPhotoComment = typeof photoComments.$inferInsert;
+
+export type EventReview = typeof eventReviews.$inferSelect;
+export type InsertEventReview = typeof eventReviews.$inferInsert;
 
 export type WishlistRestaurant = typeof wishlistRestaurants.$inferSelect;
 

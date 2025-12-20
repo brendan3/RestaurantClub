@@ -542,6 +542,102 @@ export async function getSocialFeed(): Promise<SocialFeedResponse> {
 }
 
 // ============================================
+// PHOTO FEED & COMMENTS
+// ============================================
+
+export interface PhotoFeedItem {
+  photo: {
+    id: string;
+    eventId: string;
+    userId: string;
+    imageUrl: string;
+    caption?: string | null;
+    createdAt: string;
+  };
+  event: {
+    id: string;
+    restaurantName: string;
+    eventDate: string;
+  };
+  club: {
+    id: string;
+    name: string;
+  };
+  user: {
+    id: string;
+    name: string;
+    avatar?: string | null;
+  };
+  commentCount: number;
+}
+
+export interface PhotoFeedResponse {
+  items: PhotoFeedItem[];
+  hasMore: boolean;
+}
+
+export async function getPhotoFeed(opts?: { limit?: number; offset?: number }): Promise<PhotoFeedResponse> {
+  const params = new URLSearchParams();
+  if (opts?.limit) params.set("limit", opts.limit.toString());
+  if (opts?.offset) params.set("offset", opts.offset.toString());
+  return apiRequest<PhotoFeedResponse>(`/api/social/photo-feed?${params.toString()}`);
+}
+
+export interface PhotoComment {
+  id: string;
+  photoId: string;
+  userId: string;
+  text: string;
+  createdAt: string;
+  user: {
+    id: string;
+    name: string;
+    avatar?: string | null;
+  };
+}
+
+export async function getPhotoComments(photoId: string): Promise<PhotoComment[]> {
+  return apiRequest<PhotoComment[]>(`/api/photos/${photoId}/comments`);
+}
+
+export async function addPhotoComment(photoId: string, text: string): Promise<PhotoComment[]> {
+  return apiRequest<PhotoComment[]>(`/api/photos/${photoId}/comments`, {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
+}
+
+// ============================================
+// EVENT REVIEWS
+// ============================================
+
+export interface EventReview {
+  id: string;
+  eventId: string;
+  userId: string;
+  rating: number; // 1-5
+  text?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user: {
+    id: string;
+    name: string;
+    avatar?: string | null;
+  };
+}
+
+export async function getEventReviews(eventId: string): Promise<EventReview[]> {
+  return apiRequest<EventReview[]>(`/api/events/${eventId}/reviews`);
+}
+
+export async function postEventReview(eventId: string, rating: number, text?: string): Promise<EventReview[]> {
+  return apiRequest<EventReview[]>(`/api/events/${eventId}/reviews`, {
+    method: "POST",
+    body: JSON.stringify({ rating, text }),
+  });
+}
+
+// ============================================
 // NEARBY RESTAURANTS FUNCTIONS
 // ============================================
 

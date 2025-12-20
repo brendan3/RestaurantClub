@@ -1480,6 +1480,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Photo feed for social page (photos from user's clubs)
+  app.get("/api/social/photo-feed", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.json({ items: [], hasMore: false });
+    }
+    
+    try {
+      const limit = parseInt(req.query.limit as string) || 2;
+      const offset = parseInt(req.query.offset as string) || 0;
+      
+      const feedItems = await storage.getPhotoFeed(req.user!.id, { limit: limit + 1, offset });
+      const hasMore = feedItems.length > limit;
+      const items = hasMore ? feedItems.slice(0, limit) : feedItems;
+      
+      res.json({ items, hasMore });
+    } catch (error) {
+      console.error("Error fetching photo feed:", error);
+      res.status(500).json({ error: "Failed to fetch photo feed" });
+    }
+  });
+
+  // Get comments for a photo
+  app.get("/api/photos/:id/comments", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.json([]);
+    }
+    
+    try {
+      const photoId = req.params.id;
+      const comments = await storage.getPhotoComments(photoId);
+      res.json(comments);
+    } catch (error) {
+      console.error("Error fetching photo comments:", error);
+      res.status(500).json({ error: "Failed to fetch comments" });
+    }
+  });
+
+  // Add comment to a photo
+  app.post("/api/photos/:id/comments", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.status(501).json({ error: "Comments not available in mock mode" });
+    }
+    
+    try {
+      const photoId = req.params.id;
+      const { text } = req.body as { text?: string };
+      
+      if (!text || typeof text !== "string" || text.trim().length === 0) {
+        return res.status(400).json({ error: "Comment text is required" });
+      }
+      
+      const comment = await storage.addPhotoComment(photoId, req.user!.id, text.trim());
+      const comments = await storage.getPhotoComments(photoId);
+      res.json(comments);
+    } catch (error) {
+      console.error("Error adding comment:", error);
+      res.status(500).json({ error: "Failed to add comment" });
+    }
+  });
+
+  // Get reviews for an event
+  app.get("/api/events/:id/reviews", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.json([]);
+    }
+    
+    try {
+      const eventId = req.params.id;
+      const reviews = await storage.getEventReviews(eventId);
+      res.json(reviews);
+    } catch (error) {
+      console.error("Error fetching event reviews:", error);
+      res.status(500).json({ error: "Failed to fetch reviews" });
+    }
+  });
+
+  // Post/update review for an event
+  app.post("/api/events/:id/reviews", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.status(501).json({ error: "Reviews not available in mock mode" });
+    }
+    
+    try {
+      const eventId = req.params.id;
+      const { rating, text } = req.body as { rating?: number; text?: string };
+      
+      if (!rating || typeof rating !== "number" || rating < 1 || rating > 5) {
+        return res.status(400).json({ error: "Rating must be between 1 and 5" });
+      }
+      
+      // Check if user attended the event (optional validation)
+      const event = await storage.getEventById(eventId);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+      
+      const review = await storage.upsertEventReview(eventId, req.user!.id, rating, text || null);
+      const reviews = await storage.getEventReviews(eventId);
+      res.json(reviews);
+    } catch (error) {
+      console.error("Error posting review:", error);
+      res.status(500).json({ error: "Failed to post review" });
+    }
+  });
+
   // ============================================
   // NEARBY RESTAURANTS ENDPOINT (Google Places API New)
   // ============================================
