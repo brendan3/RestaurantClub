@@ -385,7 +385,7 @@ export default function EventDetail() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 overflow-x-hidden">
       {/* Back Button */}
       <Button variant="ghost" asChild className="gap-2 -ml-2">
         <Link href={backDestination}>
@@ -467,22 +467,22 @@ export default function EventDetail() {
           <Badge className="bg-white/20 backdrop-blur-md text-white hover:bg-white/30 border-none px-4 py-1.5 text-sm font-medium rounded-full w-fit mb-4">
             {event.cuisine}
           </Badge>
-          <h1 className="text-4xl md:text-5xl font-heading font-bold mb-3 text-white">
+          <h1 className="text-4xl md:text-5xl font-heading font-bold mb-3 text-white break-words">
             {event.restaurantName}
           </h1>
-          <div className="flex flex-wrap gap-4 text-white/90 font-medium">
-            <span className="flex items-center gap-1.5 bg-black/20 backdrop-blur-sm px-3 py-1 rounded-full">
+          <div className="flex flex-wrap gap-4 text-white/90 font-medium min-w-0">
+            <span className="flex items-center gap-1.5 bg-black/20 backdrop-blur-sm px-3 py-1 rounded-full min-w-0 max-w-full">
               <Calendar className="w-4 h-4" /> 
               {eventDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </span>
-            <span className="flex items-center gap-1.5 bg-black/20 backdrop-blur-sm px-3 py-1 rounded-full">
+            <span className="flex items-center gap-1.5 bg-black/20 backdrop-blur-sm px-3 py-1 rounded-full min-w-0 max-w-full">
               <Clock className="w-4 h-4" /> 
               {eventDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
             </span>
             {event.location && (
-              <span className="flex items-center gap-1.5 bg-black/20 backdrop-blur-sm px-3 py-1 rounded-full">
-                <MapPin className="w-4 h-4" /> 
-                {event.location}
+              <span className="flex items-center gap-1.5 bg-black/20 backdrop-blur-sm px-3 py-1 rounded-full min-w-0 max-w-full">
+                <MapPin className="w-4 h-4 shrink-0" /> 
+                <span className="min-w-0 truncate">{event.location}</span>
               </span>
             )}
           </div>
