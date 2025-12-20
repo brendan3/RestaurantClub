@@ -99,6 +99,7 @@ export interface User {
 export interface Club {
   id: string;
   name: string;
+  logo?: string | null;
   members: number;
   membersList: Array<{
     id: string;
@@ -378,7 +379,7 @@ export async function updateEvent(eventId: string, eventData: {
 
 export async function updateClub(
   clubId: string,
-  data: { name?: string; type?: "private" | "public" }
+  data: { name?: string; type?: "private" | "public"; logo?: string | null }
 ): Promise<Club> {
   return apiRequest<Club>(`/api/clubs/${clubId}`, {
     method: "PATCH",
@@ -623,6 +624,15 @@ export async function deleteEventPhoto(eventId: string, photoId: string): Promis
 export async function uploadUserAvatar(file: File): Promise<string> {
   const dataUrl = await fileToDataUrl(file);
   const res = await apiRequest<{ imageUrl: string }>("/api/user/me/avatar-upload", {
+    method: "POST",
+    body: JSON.stringify({ dataUrl }),
+  });
+  return res.imageUrl;
+}
+
+export async function uploadClubLogo(clubId: string, file: File): Promise<string> {
+  const dataUrl = await fileToDataUrl(file);
+  const res = await apiRequest<{ imageUrl: string }>(`/api/clubs/${clubId}/logo-upload`, {
     method: "POST",
     body: JSON.stringify({ dataUrl }),
   });

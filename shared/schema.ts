@@ -24,6 +24,7 @@ export const clubs = pgTable("clubs", {
   name: text("name").notNull(),
   type: text("type").notNull(), // 'private' | 'public'
   joinCode: varchar("join_code", { length: 16 }),
+  logo: text("logo"), // nullable; emoji or URL
   createdAt: timestamp("created_at").defaultNow(),
 });
 

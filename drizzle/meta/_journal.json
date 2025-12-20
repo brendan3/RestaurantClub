@@ -36,6 +36,13 @@
       "when": 1766094486358,
       "tag": "0004_add_push_devices",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1766244575554,
+      "tag": "0005_add_club_logo",
+      "breakpoints": true
     }
   ]
 }

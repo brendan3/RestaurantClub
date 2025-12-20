@@ -166,6 +166,7 @@ export class DatabaseStorage implements IStorage {
         name: clubs.name,
         type: clubs.type,
         joinCode: clubs.joinCode,
+        logo: clubs.logo,
         createdAt: clubs.createdAt,
       })
       .from(clubs)
@@ -198,10 +199,11 @@ export class DatabaseStorage implements IStorage {
       .where(eq(clubs.id, clubId));
   }
 
-  async updateClub(clubId: string, updates: { name?: string; type?: string }): Promise<Club> {
+  async updateClub(clubId: string, updates: { name?: string; type?: string; logo?: string | null }): Promise<Club> {
     const updateData: any = {};
     if (updates.name !== undefined) updateData.name = updates.name;
     if (updates.type !== undefined) updateData.type = updates.type;
+    if (updates.logo !== undefined) updateData.logo = updates.logo;
     const result = await db
       .update(clubs)
       .set(updateData)

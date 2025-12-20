@@ -60,7 +60,7 @@ export interface IStorage {
   getClubByJoinCode(joinCode: string): Promise<Club | undefined>;
   createClub(club: any): Promise<Club>;
   updateClubJoinCode(clubId: string, joinCode: string): Promise<void>;
-  updateClub(clubId: string, updates: { name?: string; type?: string }): Promise<Club>;
+  updateClub(clubId: string, updates: { name?: string; type?: string; logo?: string | null }): Promise<Club>;
   deleteClub(clubId: string): Promise<void>;
   updateUserProfile(userId: string, data: { name?: string; avatar?: string | null }): Promise<User>;
   addClubMember(clubId: string, userId: string, role?: string): Promise<void>;

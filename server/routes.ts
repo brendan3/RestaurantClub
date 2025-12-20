@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { mockEvents, mockUser, mockClubs } from "./mockData";
 import * as auth from "./auth";
 import { generateJoinCode, datePollOptions, datePolls, datePollVotes } from "@shared/schema";
-import { isCloudinaryConfigured, uploadEventImage, uploadUserAvatar } from "./cloudinary";
+import { isCloudinaryConfigured, uploadEventImage, uploadUserAvatar, uploadClubLogo } from "./cloudinary";
 import { db } from "./db";
 import { and, asc, desc, eq, gt, sql } from "drizzle-orm";
 import { sendPushNotifications } from "./push";
@@ -468,10 +468,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     try {
       const clubId = req.params.id;
-      const { name, type } = req.body as { name?: string; type?: string };
+      const { name, type, logo } = req.body as { name?: string; type?: string; logo?: string | null };
       
       if (name !== undefined && (!name || typeof name !== "string")) {
         return res.status(400).json({ error: "Club name must be a non-empty string" });
+      }
+      if (logo !== undefined && logo !== null && typeof logo !== "string") {
+        return res.status(400).json({ error: "Club logo must be a string or null" });
       }
       
       const club = await storage.getClubById(clubId);
@@ -485,7 +488,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Only owners can update the club" });
       }
       
-      const updated = await storage.updateClub(clubId, { name, type });
+      const updated = await storage.updateClub(clubId, {
+        name,
+        type,
+        logo: logo === undefined ? undefined : (logo ? logo.trim() : null),
+      });
       const updatedMembers = await storage.getClubMembers(clubId);
       
       res.json({
@@ -501,6 +508,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating club:", error);
       res.status(500).json({ error: "Failed to update club" });
+    }
+  });
+
+  // Upload club logo to Cloudinary (owner only; returns URL, does not update DB)
+  app.post("/api/clubs/:id/logo-upload", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.status(501).json({ error: "Club logo uploads not available in mock mode" });
+    }
+
+    try {
+      const clubId = req.params.id;
+
+      const club = await storage.getClubById(clubId);
+      if (!club) return res.status(404).json({ error: "Club not found" });
+
+      const members = await storage.getClubMembers(clubId);
+      const isOwner = members.some(m => m.id === req.user!.id && m.role === "owner");
+      if (!isOwner) {
+        return res.status(403).json({ error: "Only owners can update the club" });
+      }
+
+      if (!isCloudinaryConfigured()) {
+        return res.status(501).json({ error: "Cloudinary not configured" });
+      }
+
+      const { dataUrl } = req.body as { dataUrl?: string };
+      if (!dataUrl || typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {
+        return res.status(400).json({ error: "dataUrl must be a valid image data URL" });
+      }
+
+      const imageUrl = await uploadClubLogo(clubId, dataUrl);
+      res.json({ imageUrl });
+    } catch (err) {
+      console.error("Error uploading club logo:", err);
+      res.status(500).json({ error: "Failed to upload club logo" });
     }
   });
 

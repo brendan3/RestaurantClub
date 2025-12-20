@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ASSETS } from "@/lib/mockData";
 import { Link } from "wouter";
 import { Calendar, Clock, Trophy, Crown, Plus, Users as UsersIcon, Copy, Check, Share2, Mail, MessageCircle, MapPin, Camera, UtensilsCrossed, Pencil } from "lucide-react";
@@ -31,6 +31,7 @@ import {
   getClubSuperlatives,
   updateClubSuperlative,
   type ClubSuperlative,
+  uploadClubLogo,
 } from "@/lib/api";
 import { toast } from "sonner";
 import { useEventModal } from "@/lib/event-modal-context";
@@ -85,6 +86,10 @@ export default function Club() {
   const [copied, setCopied] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [newName, setNewName] = useState("");
+  const [isEditingLogo, setIsEditingLogo] = useState(false);
+  const [logoValue, setLogoValue] = useState("");
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isSavingClub, setIsSavingClub] = useState(false);
   const [isDeleteClubOpen, setIsDeleteClubOpen] = useState(false);
   const [isDeletingClub, setIsDeletingClub] = useState(false);
@@ -430,7 +435,55 @@ Sign up at the app and enter the code to join!`;
   return (
     <div className="space-y-10">
       <div className="text-center max-w-2xl mx-auto space-y-4">
-        <img src={ASSETS.mascot} alt="Mascot" className="w-24 h-24 mx-auto object-contain animate-bounce-slow" />
+        {(() => {
+          const raw = club.logo?.trim();
+          const isUrl = !!raw && /^https?:\/\//i.test(raw);
+          const canEditLogo = !!isOwner;
+          const onEdit = () => {
+            if (!canEditLogo) return;
+            setLogoValue(raw ?? "");
+            setIsEditingLogo(true);
+          };
+
+          if (isUrl) {
+            return (
+              <button
+                type="button"
+                onClick={onEdit}
+                className={`mx-auto w-24 h-24 rounded-full overflow-hidden shadow-md bg-white ${canEditLogo ? "cursor-pointer" : "cursor-default"}`}
+                aria-label={canEditLogo ? "Edit club logo" : "Club logo"}
+              >
+                <img src={raw!} alt={`${club.name} logo`} className="w-full h-full object-cover" />
+              </button>
+            );
+          }
+
+          if (raw) {
+            return (
+              <button
+                type="button"
+                onClick={onEdit}
+                className={`mx-auto w-24 h-24 rounded-full shadow-md bg-white flex items-center justify-center text-5xl ${canEditLogo ? "cursor-pointer" : "cursor-default"}`}
+                aria-label={canEditLogo ? "Edit club logo" : "Club logo"}
+              >
+                {raw}
+              </button>
+            );
+          }
+
+          return (
+            <img
+              src={ASSETS.mascot}
+              alt="Mascot"
+              className={`w-24 h-24 mx-auto object-contain animate-bounce-slow ${isOwner ? "cursor-pointer" : ""}`}
+              onClick={() => {
+                if (!isOwner) return;
+                setLogoValue("");
+                setIsEditingLogo(true);
+              }}
+            />
+          );
+        })()}
         <div className="flex items-center justify-center gap-2 flex-wrap">
           <h1 className="text-3xl md:text-4xl font-heading font-bold text-foreground">{club.name}</h1>
           {isOwner && (
@@ -441,6 +494,19 @@ Sign up at the app and enter the code to join!`;
               onClick={() => { setNewName(club.name); setIsEditingName(true); }}
             >
               Edit name
+            </Button>
+          )}
+          {isOwner && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="rounded-full"
+              onClick={() => {
+                setLogoValue((club.logo ?? "").trim());
+                setIsEditingLogo(true);
+              }}
+            >
+              Edit logo
             </Button>
           )}
         </div>
@@ -889,6 +955,92 @@ Sign up at the app and enter the code to join!`;
                   {isSavingClub ? "Saving..." : "Save"}
                 </Button>
               </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Edit Club Logo Modal */}
+      {isOwner && (
+        <Dialog open={isEditingLogo} onOpenChange={setIsEditingLogo}>
+          <DialogContent className="sm:max-w-[420px] rounded-[1.25rem]">
+            <DialogHeader>
+              <DialogTitle>Edit Club Logo</DialogTitle>
+              <DialogDescription>Set an emoji or paste an image URL. Leave blank to use the default mascot.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <label className="text-sm font-medium">Logo (emoji or URL)</label>
+              <input
+                type="text"
+                value={logoValue}
+                onChange={(e) => setLogoValue(e.target.value)}
+                className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder='e.g. "🍣" or "https://..."'
+              />
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => logoFileInputRef.current?.click()}
+                  disabled={isUploadingLogo}
+                >
+                  {isUploadingLogo ? "Uploading..." : "Upload image"}
+                </Button>
+                <input
+                  ref={logoFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (!file) return;
+                    setIsUploadingLogo(true);
+                    try {
+                      const url = await uploadClubLogo(club.id, file);
+                      setLogoValue(url);
+                      toast.success("Logo uploaded");
+                    } catch (err: any) {
+                      if (err?.message?.toLowerCase().includes("cloudinary not configured")) {
+                        toast.error("Image uploads are not available right now; you can still paste an image URL or emoji.");
+                      } else {
+                        toast.error(err?.message || "Failed to upload logo");
+                      }
+                    } finally {
+                      setIsUploadingLogo(false);
+                    }
+                  }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Tip: use an emoji for best results, or upload/paste a Cloudinary URL.
+              </p>
+            </div>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button variant="ghost" onClick={() => setIsEditingLogo(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  setIsSavingClub(true);
+                  try {
+                    const value = logoValue.trim();
+                    const updated = await updateClub(club.id, { logo: value ? value : null });
+                    setClubs([updated, ...clubs.slice(1)]);
+                    toast.success("Club logo updated");
+                    setIsEditingLogo(false);
+                  } catch (error: any) {
+                    toast.error(error.message || "Failed to update club logo");
+                  } finally {
+                    setIsSavingClub(false);
+                  }
+                }}
+                disabled={isSavingClub || isUploadingLogo}
+              >
+                {isSavingClub ? "Saving..." : "Save"}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
