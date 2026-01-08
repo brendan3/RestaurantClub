@@ -689,7 +689,7 @@ Sign up at the app and enter the code to join!`;
                   variant="outline"
                   className="rounded-full font-bold bg-white shadow-sm border border-white/50 text-foreground hover:bg-primary/10 hover:text-primary transition-all"
                 >
-                  <Link href="/join">Join with Code</Link>
+                  <Link href="/join">Join Club by Code</Link>
                 </Button>
               </>
             )}
