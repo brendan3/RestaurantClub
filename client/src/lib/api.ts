@@ -646,9 +646,11 @@ export interface NearbyPlace {
   name: string;
   address: string;
   primaryType?: string;
+  types?: string[]; // All place types from Google Places
   lat: number;
   lng: number;
   rating?: number;
+  userRatingsTotal?: number;
   priceLevel?: string;
   googleMapsUrl?: string;
   photoNames?: string[]; // Google Places photo references for proxied loading (multiple photos)

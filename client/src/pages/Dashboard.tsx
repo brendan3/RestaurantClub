@@ -95,8 +95,11 @@ export default function Dashboard() {
   const [allUserRsvps, setAllUserRsvps] = useState<Map<string, any>>(new Map());
 
   // Nearby restaurants state
-  const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[]>([]);
+  const [rawNearbyPlaces, setRawNearbyPlaces] = useState<NearbyPlace[]>([]); // Store raw fetched places
   const [isLoadingNearby, setIsLoadingNearby] = useState(false);
+  const [filterCasual, setFilterCasual] = useState(false);
+  const [filterNice, setFilterNice] = useState(false);
+  const [filterBars, setFilterBars] = useState(false);
 
   // Photo gallery state
   const [galleryPlace, setGalleryPlace] = useState<NearbyPlace | null>(null);
@@ -335,6 +338,72 @@ Sign up at the app and enter the code to join!`;
     }
   };
 
+  // Client-side safety filter to ensure no unwanted places leak through
+  const filterPlacesClientSide = (places: NearbyPlace[]): NearbyPlace[] => {
+    const excludedTypes = [
+      "lodging",
+      "convenience_store",
+      "supermarket",
+      "grocery_or_supermarket",
+      "gas_station",
+      "store",
+      "shopping_mall",
+    ];
+    
+    const allowedTypes = ["restaurant", "bar", "cafe"];
+    
+    return places.filter((place) => {
+      const types = place.types || [];
+      const primaryType = place.primaryType || "";
+      
+      // Check if place has any excluded types
+      const hasExcludedType = excludedTypes.some(
+        (excluded) => types.includes(excluded) || primaryType === excluded
+      );
+      
+      if (hasExcludedType) {
+        return false;
+      }
+      
+      // Check if place has at least one allowed type
+      const hasAllowedType = allowedTypes.some(
+        (allowed) => types.includes(allowed) || primaryType.includes(allowed)
+      );
+      
+      return hasAllowedType;
+    });
+  };
+
+  // Apply UI filters (casual, nice, bars)
+  const applyUIFilters = (places: NearbyPlace[]): NearbyPlace[] => {
+    let filtered = places;
+    
+    if (filterCasual) {
+      filtered = filtered.filter((place) => {
+        // priceLevel: 0 = free, 1 = inexpensive, 2 = moderate, 3 = expensive, 4 = very expensive
+        const priceLevel = place.priceLevel ? parseInt(place.priceLevel) : undefined;
+        return priceLevel === undefined || priceLevel <= 2;
+      });
+    }
+    
+    if (filterNice) {
+      filtered = filtered.filter((place) => {
+        const priceLevel = place.priceLevel ? parseInt(place.priceLevel) : undefined;
+        return priceLevel !== undefined && priceLevel >= 3;
+      });
+    }
+    
+    if (filterBars) {
+      filtered = filtered.filter((place) => {
+        const types = place.types || [];
+        const primaryType = place.primaryType || "";
+        return types.includes("bar") || primaryType === "bar";
+      });
+    }
+    
+    return filtered;
+  };
+
   // Search for nearby restaurants
   const searchNearbyEats = async () => {
     setIsLoadingNearby(true);
@@ -344,17 +413,23 @@ Sign up at the app and enter the code to join!`;
       const latitude = position.coords.latitude;
       const longitude = position.coords.longitude;
 
-      // Search for "best food" near the user
+      // Search for restaurants near the user
       const result = await searchNearbyRestaurants(latitude, longitude);
-      setNearbyPlaces(result.places.slice(0, 6)); // Limit to 6 results
+      
+      // Apply client-side safety filtering and store raw filtered results
+      const safeFiltered = filterPlacesClientSide(result.places);
+      setRawNearbyPlaces(safeFiltered);
     } catch (geoError: any) {
       console.warn("RC: geolocation failed for nearby eats", geoError);
       // Don't show error toast for this - it's just a nice-to-have feature
-      setNearbyPlaces([]);
+      setRawNearbyPlaces([]);
     } finally {
       setIsLoadingNearby(false);
     }
   };
+
+  // Compute filtered places based on UI filters
+  const nearbyPlaces = applyUIFilters(rawNearbyPlaces).slice(0, 6);
 
   // Photo gallery functions
   const openPhotoGallery = (place: NearbyPlace) => {
@@ -418,7 +493,7 @@ Sign up at the app and enter the code to join!`;
         <div>
           <p className="text-muted-foreground font-medium mb-1">Welcome back,</p>
           <h1 className="text-3xl md:text-4xl font-heading font-bold text-foreground tracking-tight">
-            Hungry, {user?.name}? 😋
+            Let's Get Dinner, {user?.name} 😋
           </h1>
         </div>
         <div className="hidden md:flex gap-2">
@@ -909,9 +984,39 @@ Sign up at the app and enter the code to join!`;
             </Card>
           )}
 
-          {/* Eats Near Me */}
+          {/* Good dinner spots near you */}
           <div className="space-y-5">
-            <h3 className="font-heading font-bold text-xl text-foreground/80 px-2">Eats Near Me 🤤</h3>
+            <div className="flex items-center justify-between px-2">
+              <h3 className="font-heading font-bold text-xl text-foreground/80">Good dinner spots near you</h3>
+            </div>
+            
+            {/* Filter chips */}
+            <div className="flex flex-wrap gap-2 px-2">
+              <Button
+                variant={filterCasual ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterCasual(!filterCasual)}
+                className="rounded-full text-xs font-medium"
+              >
+                Casual
+              </Button>
+              <Button
+                variant={filterNice ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterNice(!filterNice)}
+                className="rounded-full text-xs font-medium"
+              >
+                Nice
+              </Button>
+              <Button
+                variant={filterBars ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterBars(!filterBars)}
+                className="rounded-full text-xs font-medium"
+              >
+                Bars
+              </Button>
+            </div>
             {isLoadingNearby ? (
               <div className="flex items-center justify-center py-8">
                 <div className="text-center">

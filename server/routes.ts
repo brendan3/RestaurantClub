@@ -1589,18 +1589,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // NEARBY RESTAURANTS ENDPOINT (Google Places API New)
   // ============================================
 
+  // Filtering constants - easily tunable
+  const MIN_RATING_DEFAULT = 4.5;
+  const MIN_RATING_FALLBACK = 4.2;
+  const MIN_USER_RATINGS_DEFAULT = 50;
+  const MIN_USER_RATINGS_FALLBACK = 20;
+  const MIN_RESULTS_THRESHOLD = 6;
+
   // Interface for the response we send to the client
   interface NearbyRestaurant {
     id: string;
     name: string;
     address: string;
     primaryType?: string;
+    types?: string[]; // All place types from Google Places
     lat: number;
     lng: number;
     rating?: number;
+    userRatingsTotal?: number;
     priceLevel?: string;
     googleMapsUrl?: string;
     photoNames?: string[]; // Google Places photo reference names (multiple photos)
+  }
+
+  // Helper function to filter places based on types and quality thresholds
+  function filterRestaurants(
+    places: any[],
+    minRating: number,
+    minUserRatings: number
+  ): NearbyRestaurant[] {
+    const excludedTypes = [
+      "lodging",
+      "convenience_store",
+      "supermarket",
+      "grocery_or_supermarket",
+      "gas_station",
+      "store",
+      "shopping_mall",
+    ];
+    
+    const allowedTypes = ["restaurant", "bar", "cafe"];
+    
+    return places
+      .map((place: any) => {
+        const types = place.types || [];
+        const primaryType = place.primaryType || "";
+        
+        // Check if place has any excluded types
+        const hasExcludedType = excludedTypes.some(
+          (excluded) => types.includes(excluded) || primaryType === excluded
+        );
+        
+        if (hasExcludedType) {
+          return null;
+        }
+        
+        // Check if place has at least one allowed type
+        const hasAllowedType = allowedTypes.some(
+          (allowed) => types.includes(allowed) || primaryType.includes(allowed)
+        );
+        
+        if (!hasAllowedType) {
+          return null;
+        }
+        
+        // Check quality thresholds
+        const rating = place.rating;
+        const userRatingsTotal = place.userRatingsTotal || 0;
+        
+        if (rating === undefined || rating < minRating) {
+          return null;
+        }
+        
+        if (userRatingsTotal < minUserRatings) {
+          return null;
+        }
+        
+        return {
+          id: place.id || "",
+          name: place.displayName?.text || "Unknown",
+          address: place.formattedAddress || "",
+          primaryType: place.primaryType || undefined,
+          types: types,
+          lat: place.location?.latitude || 0,
+          lng: place.location?.longitude || 0,
+          rating: rating,
+          userRatingsTotal: userRatingsTotal,
+          priceLevel: place.priceLevel || undefined,
+          googleMapsUrl: place.googleMapsUri || undefined,
+          photoNames: place.photos?.map((photo: any) => photo.name).filter(Boolean) || [],
+        };
+      })
+      .filter((place): place is NearbyRestaurant => place !== null);
   }
 
   // Search nearby restaurants using Google Places API (New)
@@ -1628,10 +1708,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Use Google Places API (New) - places:searchNearby
       const baseUrl = "https://places.googleapis.com/v1/places:searchNearby";
       
-      // Build the request body
+      // Build the request body with multiple included types
       const requestBody: any = {
-        includedTypes: ["restaurant"],
-        maxResultCount: 15,
+        includedTypes: ["restaurant", "cafe", "bar"],
+        maxResultCount: 20, // Request more to account for filtering
         locationRestriction: {
           circle: {
             center: {
@@ -1642,10 +1722,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
         },
       };
-      
-      // If there's a text query, we need to use textSearch instead
-      // For now, we'll use searchNearby which doesn't support text queries directly
-      // The query parameter is ignored in the new API's searchNearby
       
       // Dev logging
       if (process.env.NODE_ENV === "development") {
@@ -1658,7 +1734,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         headers: {
           "Content-Type": "application/json",
           "X-Goog-Api-Key": apiKey,
-          "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.primaryType,places.location,places.rating,places.priceLevel,places.googleMapsUri,places.photos",
+          "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.primaryType,places.types,places.location,places.rating,places.userRatingsTotal,places.priceLevel,places.googleMapsUri,places.photos",
         },
         body: JSON.stringify(requestBody),
       });
@@ -1688,21 +1764,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: "Failed to search restaurants" });
       }
       
-      // Map to our clean DTO format
-      const places: NearbyRestaurant[] = (data.places || []).map((place: any) => ({
-        id: place.id || "",
-        name: place.displayName?.text || "Unknown",
-        address: place.formattedAddress || "",
-        primaryType: place.primaryType || undefined,
-        lat: place.location?.latitude || 0,
-        lng: place.location?.longitude || 0,
-        rating: place.rating || undefined,
-        priceLevel: place.priceLevel || undefined,
-        googleMapsUrl: place.googleMapsUri || undefined,
-        photoNames: place.photos?.map((photo: any) => photo.name).filter(Boolean) || [],
-      }));
+      // Apply filtering with fallback logic
+      let filteredPlaces = filterRestaurants(
+        data.places || [],
+        MIN_RATING_DEFAULT,
+        MIN_USER_RATINGS_DEFAULT
+      );
       
-      res.json({ places });
+      // Fallback: if we have fewer than MIN_RESULTS_THRESHOLD results, relax user ratings threshold
+      if (filteredPlaces.length < MIN_RESULTS_THRESHOLD) {
+        if (process.env.NODE_ENV === "development") {
+          console.log(`[Places API] Only ${filteredPlaces.length} results, relaxing userRatingsTotal threshold to ${MIN_USER_RATINGS_FALLBACK}`);
+        }
+        filteredPlaces = filterRestaurants(
+          data.places || [],
+          MIN_RATING_DEFAULT,
+          MIN_USER_RATINGS_FALLBACK
+        );
+      }
+      
+      // Fallback: if still too few, relax rating threshold
+      if (filteredPlaces.length < MIN_RESULTS_THRESHOLD) {
+        if (process.env.NODE_ENV === "development") {
+          console.log(`[Places API] Only ${filteredPlaces.length} results, relaxing rating threshold to ${MIN_RATING_FALLBACK}`);
+        }
+        filteredPlaces = filterRestaurants(
+          data.places || [],
+          MIN_RATING_FALLBACK,
+          MIN_USER_RATINGS_FALLBACK
+        );
+      }
+      
+      // Dev logging
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Places API] Filtered places count:", filteredPlaces.length);
+      }
+      
+      res.json({ places: filteredPlaces });
     } catch (error) {
       console.error("[Places API] Error searching nearby restaurants:", error);
       res.status(500).json({ error: "Failed to search restaurants" });
