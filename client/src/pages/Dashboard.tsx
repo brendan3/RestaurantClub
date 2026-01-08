@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { ASSETS } from "@/lib/mockData";
-import { Calendar, Clock, MapPin, MessageSquare, Heart, Share2, ChefHat, Check, X, Plus, ExternalLink, Copy, Mail, MessageCircle as MessageCircleIcon, Utensils, CheckCircle2, History, Star } from "lucide-react";
+import { Calendar, Clock, MapPin, MessageSquare, Heart, Share2, ChefHat, Check, X, Plus, ExternalLink, Copy, Mail, MessageCircle as MessageCircleIcon, Utensils, CheckCircle2, History, Star, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -388,7 +388,7 @@ Sign up at the app and enter the code to join!`;
             onClick={() => setIsAddEventOpen(true)}
             className="gap-2 rounded-full bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-all hover:scale-105"
           >
-            <Plus className="w-4 h-4" /> Add Event
+            <Search className="w-4 h-4" /> Search Restaurants
           </Button>
           <Button 
             variant="ghost" 

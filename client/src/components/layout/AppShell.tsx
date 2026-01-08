@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
-import { Calendar, Camera, ChevronLeft, Home, Map, MessageCircle, Plus, Upload, User, Users, Bell, BarChart2 } from "lucide-react";
+import { Calendar, Camera, ChevronLeft, Home, Map, MessageCircle, Plus, Upload, User, Users, Bell, BarChart2, Search } from "lucide-react";
 import { ASSETS } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -300,15 +300,15 @@ export default function AppShell({ children }: { children: ReactNode }) {
             </div>
             </Link>
 
-            {/* Desktop Add Event Button */}
+            {/* Desktop Search Restaurants Button */}
             <div className="mb-6 hidden lg:block">
                 <Button onClick={() => setIsAddEventOpen(true)} className="w-full rounded-2xl font-bold shadow-soft hover:shadow-lg hover:-translate-y-1 transition-all bg-primary text-white h-12">
-                    <Plus className="w-5 h-5 mr-2" /> Add Event
+                    <Search className="w-5 h-5 mr-2" /> Search Restaurants
                 </Button>
             </div>
             <div className="mb-6 lg:hidden flex justify-center">
                 <Button onClick={() => setIsAddEventOpen(true)} size="icon" className="rounded-2xl font-bold shadow-soft bg-primary text-white h-10 w-10">
-                    <Plus className="w-5 h-5" />
+                    <Search className="w-5 h-5" />
                 </Button>
             </div>
 
@@ -367,9 +367,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
            <span className="font-heading font-bold text-lg text-foreground/90">Restaurant Club</span>
         </Link>
         <div className="flex items-center gap-3">
-            {/* Header Add Button */}
+            {/* Header Search Restaurants Button */}
             <button onClick={() => setIsAddEventOpen(true)} className="w-9 h-9 rounded-full bg-primary text-white shadow-sm flex items-center justify-center active:scale-95 transition-transform">
-                <Plus className="w-5 h-5" />
+                <Search className="w-5 h-5" />
             </button>
             {/* Notification Bell */}
             <Popover open={isNotificationOpen} onOpenChange={setIsNotificationOpen}>

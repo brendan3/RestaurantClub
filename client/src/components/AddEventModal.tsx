@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CalendarIcon, MapPin, UtensilsCrossed, Clock, Users, FileText, Navigation, Search, Star, Loader2 } from "lucide-react";
+import { CalendarIcon, MapPin, UtensilsCrossed, Clock, Users, FileText, Navigation, Search, Star, Loader2, Heart } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { createEvent, searchNearbyRestaurants, searchRestaurants, getRestaurantPhotoUrl, type NearbyPlace } from "@/lib/api";
+import { createEvent, searchNearbyRestaurants, searchRestaurants, getRestaurantPhotoUrl, addToWishlist, type NearbyPlace } from "@/lib/api";
 import { toast } from "sonner";
 import type { AddEventDefaults } from "@/lib/event-modal-context";
 
@@ -81,6 +81,7 @@ interface AddEventModalProps {
 
 export default function AddEventModal({ open, onOpenChange, onEventCreated, defaultValues }: AddEventModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSavingToWishlist, setIsSavingToWishlist] = useState(false);
   const [formData, setFormData] = useState({
     restaurantName: "",
     cuisine: "",
@@ -315,6 +316,38 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated, defa
     setNearbyPlaces([]);
     setSearchQuery("");
     toast.success(`Selected: ${place.name}`);
+  };
+
+  const handleSaveToWishlist = async () => {
+    if (!formData.restaurantName.trim()) {
+      toast.error("Please enter a restaurant name first");
+      return;
+    }
+
+    setIsSavingToWishlist(true);
+    try {
+      // Get image URL from selected place or form
+      let imageUrl: string | null = null;
+      if (selectedPlace?.photoName) {
+        imageUrl = getRestaurantPhotoUrl(selectedPlace.photoName, 800);
+      } else if (formData.imageUrl.trim()) {
+        imageUrl = formData.imageUrl.trim();
+      }
+
+      await addToWishlist({
+        name: formData.restaurantName.trim(),
+        address: formData.location.trim() || null,
+        cuisine: formData.cuisine.trim() || null,
+        placeId: selectedPlace?.placeId || null,
+        imageUrl: imageUrl || null,
+      });
+
+      toast.success("Added to wishlist! ❤️");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to add to wishlist");
+    } finally {
+      setIsSavingToWishlist(false);
+    }
   };
 
   // Get tomorrow's date as minimum date
@@ -567,14 +600,31 @@ export default function AddEventModal({ open, onOpenChange, onEventCreated, defa
               type="button"
               variant="ghost"
               onClick={() => onOpenChange(false)}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isSavingToWishlist}
               className="rounded-full"
             >
               Cancel
             </Button>
             <Button
+              type="button"
+              variant="outline"
+              onClick={handleSaveToWishlist}
+              disabled={isSubmitting || isSavingToWishlist || !formData.restaurantName.trim()}
+              className="rounded-full font-bold border-primary text-primary hover:bg-primary/10 px-6"
+            >
+              {isSavingToWishlist ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...
+                </>
+              ) : (
+                <>
+                  <Heart className="w-4 h-4 mr-2" /> Save to Wishlist
+                </>
+              )}
+            </Button>
+            <Button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isSavingToWishlist}
               className="rounded-full font-bold bg-primary hover:bg-primary/90 px-6"
             >
               {isSubmitting ? "Creating..." : "Create Event"}
