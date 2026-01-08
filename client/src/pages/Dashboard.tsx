@@ -17,7 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useEventModal } from "@/lib/event-modal-context";
-import { getUpcomingEvents, getPastEvents, getUserRsvp, rsvpToEvent, getEventRsvps, getUserClubs, getWishlist, removeFromWishlist, getEventImageUrl, searchNearbyRestaurants, getRestaurantPhotoUrl, postEventReview, type Event, type Club, type WishlistRestaurant, type NearbyPlace } from "@/lib/api";
+import { getUpcomingEvents, getPastEvents, getUserRsvp, rsvpToEvent, getEventRsvps, getUserClubs, getWishlist, removeFromWishlist, addToWishlist, getEventImageUrl, searchNearbyRestaurants, getRestaurantPhotoUrl, postEventReview, type Event, type Club, type WishlistRestaurant, type NearbyPlace } from "@/lib/api";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 
@@ -294,6 +294,44 @@ Sign up at the app and enter the code to join!`;
       toast.success("Removed from wishlist");
     } catch (error: any) {
       toast.error(error.message || "Failed to remove from wishlist");
+    }
+  };
+
+  const handleSaveToWishlist = async (place: NearbyPlace, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering the photo gallery click
+    
+    try {
+      // Get image URL from place photos
+      let imageUrl: string | null = null;
+      if (place.photoNames?.length) {
+        imageUrl = getRestaurantPhotoUrl(place.photoNames[0], 800);
+      }
+
+      // Format cuisine from primaryType
+      const formatCuisine = (primaryType?: string): string | null => {
+        if (!primaryType) return null;
+        const cleaned = primaryType
+          .replace(/_restaurant$/, "")
+          .replace(/_/g, " ")
+          .replace(/\b\w/g, (c) => c.toUpperCase());
+        return cleaned;
+      };
+
+      await addToWishlist({
+        name: place.name,
+        address: place.address || null,
+        cuisine: formatCuisine(place.primaryType) || null,
+        placeId: place.id || null,
+        imageUrl: imageUrl || null,
+      });
+
+      // Refresh wishlist to show the new item
+      const updatedWishlist = await getWishlist();
+      setWishlist(updatedWishlist);
+      
+      toast.success("Added to wishlist! ❤️");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to add to wishlist");
     }
   };
 
@@ -908,7 +946,7 @@ Sign up at the app and enter the code to join!`;
                         </div>
                       )}
                         {place.photoNames && place.photoNames.length > 1 && (
-                          <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur px-2 py-1 rounded-lg flex items-center gap-1 text-xs font-bold text-white">
+                          <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur px-2 py-1 rounded-lg flex items-center gap-1 text-xs font-bold text-white">
                             <Heart className="w-3 h-3" />
                             {place.photoNames.length}
                           </div>
@@ -919,6 +957,14 @@ Sign up at the app and enter the code to join!`;
                             {place.rating}
                           </div>
                         )}
+                        {/* Save to Wishlist Button */}
+                        <button
+                          onClick={(e) => handleSaveToWishlist(place, e)}
+                          className="absolute bottom-2 right-2 bg-primary/90 hover:bg-primary text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-lg backdrop-blur-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5"
+                        >
+                          <Heart className="w-3 h-3 fill-white" />
+                          Save
+                        </button>
                       </div>
                       <CardContent className="p-4">
                         <h4 className="font-bold text-foreground truncate">{place.name}</h4>
