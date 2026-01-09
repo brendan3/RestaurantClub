@@ -1655,13 +1655,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Check quality thresholds
         const rating = place.rating;
-        const userRatingsTotal = place.userRatingsTotal || 0;
+        // Google Places API uses userRatingCount, but we map it to userRatingsTotal for client compatibility
+        const userRatingCount = place.userRatingCount || 0;
         
         if (rating === undefined || rating < minRating) {
           return null;
         }
         
-        if (userRatingsTotal < minUserRatings) {
+        if (userRatingCount < minUserRatings) {
           return null;
         }
         
@@ -1674,7 +1675,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lat: place.location?.latitude || 0,
           lng: place.location?.longitude || 0,
           rating: rating,
-          userRatingsTotal: userRatingsTotal,
+          userRatingsTotal: userRatingCount, // Map from Google's userRatingCount to our userRatingsTotal
           priceLevel: place.priceLevel || undefined,
           googleMapsUrl: place.googleMapsUri || undefined,
           photoNames: place.photos?.map((photo: any) => photo.name).filter(Boolean) || [],
@@ -1694,16 +1695,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { lat, lng, query } = req.query;
       
+      // Validate coordinates
       if (!lat || !lng) {
-        return res.status(400).json({ error: "lat and lng are required" });
+        console.error("[Places API] Missing coordinates - lat:", lat, "lng:", lng);
+        return res.status(400).json({ error: "Missing or invalid coordinates" });
       }
       
       const latitude = parseFloat(lat as string);
       const longitude = parseFloat(lng as string);
       
       if (isNaN(latitude) || isNaN(longitude)) {
-        return res.status(400).json({ error: "Invalid lat/lng values" });
+        console.error("[Places API] Invalid coordinate values - lat:", lat, "lng:", lng);
+        return res.status(400).json({ error: "Missing or invalid coordinates" });
       }
+      
+      // Log coordinates for debugging
+      console.log("[Places API] Nearby search requested with coordinates:", { latitude, longitude });
       
       // Use Google Places API (New) - places:searchNearby
       const baseUrl = "https://places.googleapis.com/v1/places:searchNearby";
@@ -1723,45 +1730,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       };
       
+      // Full field mask with correct field name
+      const fullFieldMask = "places.id,places.displayName,places.formattedAddress,places.primaryType,places.types,places.location,places.rating,places.userRatingCount,places.priceLevel,places.googleMapsUri,places.photos";
+      
+      // Minimal field mask for fallback
+      const minimalFieldMask = "places.id,places.displayName,places.types,places.location";
+      
       // Dev logging
       if (process.env.NODE_ENV === "development") {
         console.log("[Places API] Calling:", baseUrl);
         console.log("[Places API] Request body:", JSON.stringify(requestBody, null, 2));
       }
       
-      const response = await fetch(baseUrl, {
+      // Try with full field mask first
+      let response = await fetch(baseUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-Goog-Api-Key": apiKey,
-          "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.primaryType,places.types,places.location,places.rating,places.userRatingsTotal,places.priceLevel,places.googleMapsUri,places.photos",
+          "X-Goog-FieldMask": fullFieldMask,
         },
         body: JSON.stringify(requestBody),
       });
       
+      let data: any;
+      let usedMinimalMask = false;
+      
+      // If we get a 400 error about field mask, retry with minimal mask
+      if (!response.ok && response.status === 400) {
+        const errorText = await response.text();
+        let errorData: any;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: errorText };
+        }
+        
+        // Check if it's a field mask error
+        if (errorData.message?.includes("field mask") || errorData.message?.includes("Cannot find matching fields")) {
+          console.warn("[Places API] Field mask error, retrying with minimal mask. Original error:", errorData.message);
+          
+          // Retry with minimal field mask
+          response = await fetch(baseUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Goog-Api-Key": apiKey,
+              "X-Goog-FieldMask": minimalFieldMask,
+            },
+            body: JSON.stringify(requestBody),
+          });
+          usedMinimalMask = true;
+        }
+      }
+      
       // Dev logging
       if (process.env.NODE_ENV === "development") {
-        console.log("[Places API] Response status:", response.status);
+        console.log("[Places API] Response status:", response.status, usedMinimalMask ? "(using minimal mask)" : "");
       }
       
       if (!response.ok) {
         const errorText = await response.text();
+        let errorData: any;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: errorText };
+        }
+        
         console.error("[Places API] HTTP error:", response.status, response.statusText);
-        console.error("[Places API] Error body:", errorText);
-        return res.status(500).json({ error: "Failed to search restaurants" });
+        console.error("[Places API] Error details:", {
+          status: response.status,
+          message: errorData.message || errorText,
+          coordinates: { latitude, longitude },
+        });
+        
+        // Return 502 for Places API failures (4xx or 5xx from Google)
+        return res.status(502).json({ error: "Places API failed" });
       }
       
-      const data = await response.json();
+      data = await response.json();
       
       // Dev logging
       if (process.env.NODE_ENV === "development") {
         console.log("[Places API] Response places count:", data.places?.length || 0);
       }
       
-      // Check for API-level errors
+      // Check for API-level errors in response body
       if (data.error) {
-        console.error("[Places API] API error:", data.error.message, data.error.status);
-        return res.status(500).json({ error: "Failed to search restaurants" });
+        console.error("[Places API] API error in response:", {
+          message: data.error.message,
+          status: data.error.status,
+          coordinates: { latitude, longitude },
+        });
+        return res.status(502).json({ error: "Places API failed" });
       }
       
       // Apply filtering with fallback logic
@@ -1774,7 +1836,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Fallback: if we have fewer than MIN_RESULTS_THRESHOLD results, relax user ratings threshold
       if (filteredPlaces.length < MIN_RESULTS_THRESHOLD) {
         if (process.env.NODE_ENV === "development") {
-          console.log(`[Places API] Only ${filteredPlaces.length} results, relaxing userRatingsTotal threshold to ${MIN_USER_RATINGS_FALLBACK}`);
+          console.log(`[Places API] Only ${filteredPlaces.length} results, relaxing userRatingCount threshold to ${MIN_USER_RATINGS_FALLBACK}`);
         }
         filteredPlaces = filterRestaurants(
           data.places || [],
@@ -1802,7 +1864,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({ places: filteredPlaces });
     } catch (error) {
-      console.error("[Places API] Error searching nearby restaurants:", error);
+      console.error("[Places API] Unexpected error searching nearby restaurants:", error);
       res.status(500).json({ error: "Failed to search restaurants" });
     }
   });
