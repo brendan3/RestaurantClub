@@ -17,6 +17,7 @@ import EventDetail from "@/pages/EventDetail";
 import Login from "@/pages/Login";
 import VerifyEmail from "@/pages/VerifyEmail";
 import Join from "@/pages/Join";
+import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import AppShell from "@/components/layout/AppShell";
 
 function ProtectedRoute({ component: Component }: { component: ComponentType }) {
@@ -52,6 +53,10 @@ function Router() {
       
       <Route path="/verify-email">
         <VerifyEmail />
+      </Route>
+      
+      <Route path="/privacypolicy">
+        <PrivacyPolicy />
       </Route>
       
       <Route path="/join">
