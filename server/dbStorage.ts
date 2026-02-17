@@ -808,4 +808,38 @@ export class DatabaseStorage implements IStorage {
     if (userIds.length === 0) return [];
     return await db.select().from(pushDevices).where(inArray(pushDevices.userId, userIds));
   }
+
+  async deleteUser(userId: string): Promise<void> {
+    // Get all clubs where user is owner
+    const ownedClubs = await db
+      .select({ clubId: clubMembers.clubId })
+      .from(clubMembers)
+      .where(and(eq(clubMembers.userId, userId), eq(clubMembers.role, "owner")));
+
+    // For each owned club, transfer ownership or delete
+    for (const { clubId } of ownedClubs) {
+      // Get all members of this club
+      const members = await db
+        .select({ userId: clubMembers.userId, role: clubMembers.role })
+        .from(clubMembers)
+        .where(eq(clubMembers.clubId, clubId));
+
+      // If there are other members, transfer ownership to the first admin or first member
+      const otherMembers = members.filter(m => m.userId !== userId);
+      if (otherMembers.length > 0) {
+        // Find an admin first, otherwise use first member
+        const newOwner = otherMembers.find(m => m.role === "admin") || otherMembers[0];
+        await db
+          .update(clubMembers)
+          .set({ role: "owner" })
+          .where(and(eq(clubMembers.clubId, clubId), eq(clubMembers.userId, newOwner.userId)));
+      } else {
+        // No other members, delete the club (cascade will handle related data)
+        await db.delete(clubs).where(eq(clubs.id, clubId));
+      }
+    }
+
+    // Delete user (cascade will handle clubMembers, eventAttendees, etc.)
+    await db.delete(users).where(eq(users.id, userId));
+  }
 }

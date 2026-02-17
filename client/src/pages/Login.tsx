@@ -13,7 +13,7 @@ import { Mail, CheckCircle, AlertCircle } from "lucide-react";
 
 export default function Login() {
   const [, setLocation] = useLocation();
-  const { setUser, refreshUser } = useAuth();
+  const { setUser, setGuest } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
   // Login form state
@@ -91,6 +91,12 @@ export default function Login() {
     }
   };
 
+  const handleContinueAsGuest = () => {
+    setGuest(true);
+    toast.success("Continuing as guest. Sign up anytime to sync across devices!");
+    setLocation("/");
+  };
+
   // Show signup success / verification needed screen
   if (signupSuccess) {
     return (
@@ -163,6 +169,26 @@ export default function Login() {
           </p>
         </CardHeader>
         <CardContent>
+          <div className="space-y-4 mb-4">
+            <Button 
+              onClick={handleContinueAsGuest}
+              variant="outline" 
+              className="w-full"
+              disabled={isLoading}
+            >
+              Continue as Guest
+            </Button>
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Or
+                </span>
+              </div>
+            </div>
+          </div>
           <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Login</TabsTrigger>

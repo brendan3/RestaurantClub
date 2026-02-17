@@ -78,7 +78,7 @@ const getCurrentPositionSafe = (timeoutMs = 10000): Promise<GeolocationPosition>
 };
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
   const [, navigate] = useLocation();
   const { setIsAddEventOpen, setOnEventCreatedCallback } = useEventModal();
   const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
@@ -137,7 +137,59 @@ export default function Dashboard() {
     searchNearbyEats();
   }, []);
 
+  const showSignupPrompt = (action: string) => {
+    toast.info(`Sign up to ${action}. Create an account to sync across devices and invite friends!`, {
+      action: {
+        label: "Sign Up",
+        onClick: () => navigate("/login"),
+      },
+    });
+  };
+
   const loadDashboardData = async () => {
+    // If guest, load sample data
+    if (isGuest) {
+      const { NEXT_EVENT, PAST_EVENTS, CLUB_MEMBERS } = await import("@/lib/mockData");
+      const sampleEvent: Event = {
+        id: NEXT_EVENT.id,
+        clubId: "sample-club",
+        restaurantName: NEXT_EVENT.restaurant,
+        cuisine: NEXT_EVENT.cuisine,
+        eventDate: NEXT_EVENT.date,
+        location: NEXT_EVENT.location || null,
+        status: NEXT_EVENT.status as "pending" | "confirmed" | "past",
+        pickerId: NEXT_EVENT.picker.id,
+        imageUrl: NEXT_EVENT.image,
+        picker: NEXT_EVENT.picker,
+      };
+      const sampleClub: Club = {
+        id: "sample-club",
+        name: "Sample Dining Club",
+        members: CLUB_MEMBERS.length,
+        membersList: CLUB_MEMBERS.map(m => ({ id: m.id, name: m.name, avatar: m.avatar })),
+        type: "private",
+        createdAt: new Date().toISOString(),
+      };
+      setUpcomingEvents([sampleEvent]);
+      setPastEvents(PAST_EVENTS.map(e => ({
+        id: e.id,
+        clubId: "sample-club",
+        restaurantName: e.restaurant,
+        cuisine: e.cuisine,
+        eventDate: e.date,
+        status: "past" as const,
+        pickerId: e.picker.id,
+        rating: e.rating || null,
+        totalBill: e.bill || null,
+        imageUrl: e.image,
+        picker: e.picker,
+      })));
+      setCurrentClub(sampleClub);
+      setWishlist([]);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const [events, clubs, wishlistData, pastEventsData] = await Promise.all([
         getUpcomingEvents(),
@@ -200,6 +252,11 @@ export default function Dashboard() {
 
   const handleRsvp = async (status: "attending" | "declined") => {
     if (!upcomingEvent) return;
+    
+    if (isGuest) {
+      showSignupPrompt("RSVP to events");
+      return;
+    }
     
     setIsRsvping(true);
     try {
@@ -291,6 +348,10 @@ Sign up at the app and enter the code to join!`;
   };
 
   const handleRemoveFromWishlist = async (id: string) => {
+    if (isGuest) {
+      showSignupPrompt("manage your wishlist");
+      return;
+    }
     try {
       await removeFromWishlist(id);
       setWishlist(prev => prev.filter(item => item.id !== id));
@@ -303,11 +364,17 @@ Sign up at the app and enter the code to join!`;
   const handleSaveToWishlist = async (place: NearbyPlace, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent triggering the photo gallery click
     
+    if (isGuest) {
+      showSignupPrompt("save restaurants to your wishlist");
+      return;
+    }
+    
     try {
       // Get image URL from place photos
       let imageUrl: string | null = null;
       if (place.photoNames?.length) {
-        imageUrl = getRestaurantPhotoUrl(place.photoNames[0], 800);
+        const url = getRestaurantPhotoUrl(place.photoNames[0], 800);
+        imageUrl = url ?? null;
       }
 
       // Format cuisine from primaryType
@@ -317,7 +384,7 @@ Sign up at the app and enter the code to join!`;
           .replace(/_restaurant$/, "")
           .replace(/_/g, " ")
           .replace(/\b\w/g, (c) => c.toUpperCase());
-        return cleaned;
+        return cleaned || null;
       };
 
       await addToWishlist({
@@ -493,19 +560,31 @@ Sign up at the app and enter the code to join!`;
         <div>
           <p className="text-muted-foreground font-medium mb-1">Welcome back,</p>
           <h1 className="text-3xl md:text-4xl font-heading font-bold text-foreground tracking-tight">
-            Let's Get Dinner, {user?.name} 😋
+            Let's Get Dinner{user?.name ? `, ${user.name}` : ""} 😋
           </h1>
         </div>
         <div className="hidden md:flex gap-2">
           <Button 
-            onClick={() => setIsAddEventOpen(true)}
+            onClick={() => {
+              if (isGuest) {
+                showSignupPrompt("create events");
+                return;
+              }
+              setIsAddEventOpen(true);
+            }}
             className="gap-2 rounded-full bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-all hover:scale-105"
           >
             <Search className="w-4 h-4" /> Search Restaurants
           </Button>
           <Button 
             variant="ghost" 
-            onClick={() => setIsInviteOpen(true)}
+            onClick={() => {
+              if (isGuest) {
+                showSignupPrompt("invite friends");
+                return;
+              }
+              setIsInviteOpen(true);
+            }}
             className="gap-2 rounded-full bg-white shadow-sm border border-white/50 text-foreground hover:bg-primary/10 hover:text-primary transition-all hover:scale-105"
           >
           <Share2 className="w-4 h-4" /> Invite Friend
@@ -662,7 +741,13 @@ Sign up at the app and enter the code to join!`;
               <>
                 <Button
                   className="rounded-full font-bold"
-                  onClick={() => setIsAddEventOpen(true)}
+                  onClick={() => {
+                    if (isGuest) {
+                      showSignupPrompt("create events");
+                      return;
+                    }
+                    setIsAddEventOpen(true);
+                  }}
                 >
                   <Plus className="w-4 h-4 mr-2" />
             Create Event
@@ -706,7 +791,11 @@ Sign up at the app and enter the code to join!`;
               if (nextEvent) {
                 navigate(`/event/${nextEvent.id}`);
               } else {
-                setIsAddEventOpen(true);
+                if (isGuest) {
+                  showSignupPrompt("create events");
+                } else {
+                  setIsAddEventOpen(true);
+                }
               }
             }}
             className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-white/50 shadow-soft cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 group"

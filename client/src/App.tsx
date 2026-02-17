@@ -20,8 +20,8 @@ import Join from "@/pages/Join";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import AppShell from "@/components/layout/AppShell";
 
-function ProtectedRoute({ component: Component }: { component: ComponentType }) {
-  const { isAuthenticated, isLoading } = useAuth();
+function ProtectedRoute({ component: Component, requireAuth = false }: { component: ComponentType; requireAuth?: boolean }) {
+  const { isAuthenticated, isGuest, isLoading } = useAuth();
   const [location] = useLocation();
 
   if (isLoading) {
@@ -35,7 +35,14 @@ function ProtectedRoute({ component: Component }: { component: ComponentType }) 
     );
   }
 
-  if (!isAuthenticated) {
+  // If route requires authentication and user is not authenticated (including guests), redirect to login
+  if (requireAuth && !isAuthenticated) {
+    return <Redirect to="/login" />;
+  }
+
+  // Allow guests to access non-auth-required routes
+  if (!isAuthenticated && !isGuest && !requireAuth) {
+    // If not authenticated and not a guest, redirect to login
     return <Redirect to="/login" />;
   }
 
@@ -59,12 +66,34 @@ function Router() {
         <PrivacyPolicy />
       </Route>
       
+      {/* Auth-required routes */}
       <Route path="/join">
         <AppShell>
-          <ProtectedRoute component={Join} />
+          <ProtectedRoute component={Join} requireAuth={true} />
         </AppShell>
       </Route>
       
+      <Route path="/create-club">
+        <AppShell>
+          <ProtectedRoute component={CreateClub} requireAuth={true} />
+        </AppShell>
+      </Route>
+      
+      <Route path="/profile">
+        <AppShell>
+          <ProtectedRoute component={Profile} requireAuth={true} />
+        </AppShell>
+      </Route>
+
+      <Route path="/members/:userId">
+        {(params) => (
+          <AppShell>
+            <ProtectedRoute component={() => <Profile userId={params.userId} />} requireAuth={true} />
+          </AppShell>
+        )}
+      </Route>
+      
+      {/* Guest-accessible routes */}
       <Route path="/">
         <AppShell>
           <ProtectedRoute component={Dashboard} />
@@ -93,26 +122,6 @@ function Router() {
         <AppShell>
           <ProtectedRoute component={Club} />
         </AppShell>
-      </Route>
-      
-      <Route path="/create-club">
-        <AppShell>
-          <ProtectedRoute component={CreateClub} />
-        </AppShell>
-      </Route>
-      
-      <Route path="/profile">
-        <AppShell>
-          <ProtectedRoute component={Profile} />
-        </AppShell>
-      </Route>
-
-      <Route path="/members/:userId">
-        {(params) => (
-          <AppShell>
-            <ProtectedRoute component={() => <Profile userId={params.userId} />} />
-          </AppShell>
-        )}
       </Route>
       
       <Route path="/event/:id">

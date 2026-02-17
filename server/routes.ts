@@ -66,6 +66,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get current user (protected)
   app.get("/api/user/me", auth.requireAuth, auth.getCurrentUser);
 
+  // Delete user account (protected)
+  app.delete("/api/user/delete-account", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.json({ message: "Mock mode - account not deleted" });
+    }
+
+    try {
+      await storage.deleteUser(req.user!.id);
+      res.json({ message: "Account deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      res.status(500).json({ error: "Failed to delete account" });
+    }
+  });
+
   // Register a device token for push notifications (native clients)
   app.post("/api/push/devices", auth.requireAuth, async (req, res) => {
     try {

@@ -155,6 +155,9 @@ export interface IStorage {
   // Push devices (native push token registration)
   registerPushDevice(userId: string, deviceToken: string, platform: string): Promise<void>;
   getPushDevicesForUsers(userIds: string[]): Promise<PushDevice[]>;
+
+  // Account deletion
+  deleteUser(userId: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {

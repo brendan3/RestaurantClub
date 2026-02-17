@@ -7,7 +7,9 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isGuest: boolean;
   setUser: (user: User | null) => void;
+  setGuest: (isGuest: boolean) => void;
   refreshUser: () => Promise<void>;
 }
 
@@ -15,10 +17,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [isGuest, setIsGuest] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const handleAuthExpired = () => {
     setUser(null);
+    setIsGuest(false);
     setAuthToken(null);
     toast.error("Your session has expired. Please log in again.");
     // Redirect to login - will happen automatically via ProtectedRoute
@@ -27,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshUser = async () => {
     if (!isAuthenticated()) {
       setUser(null);
+      setIsGuest(false);
       setIsLoading(false);
       return;
     }
@@ -34,9 +39,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const userData = await getCurrentUser();
       setUser(userData);
+      setIsGuest(false); // Clear guest mode when authenticated
     } catch (error: any) {
       console.error("Failed to fetch user:", error);
       setUser(null);
+      setIsGuest(false);
       // Don't show toast here - the apiRequest already handles 401
     } finally {
       setIsLoading(false);
@@ -49,13 +56,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshUser();
   }, []);
 
+  const setGuestMode = (guest: boolean) => {
+    setIsGuest(guest);
+    if (guest) {
+      setUser(null);
+      setAuthToken(null);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
         user,
         isLoading,
         isAuthenticated: !!user,
+        isGuest,
         setUser,
+        setGuest: setGuestMode,
         refreshUser,
       }}
     >

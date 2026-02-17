@@ -216,6 +216,18 @@ export async function getCurrentUser(): Promise<User> {
   return apiRequest<User>("/api/user/me");
 }
 
+/**
+ * Delete user account
+ */
+export async function deleteAccount(): Promise<void> {
+  await apiRequest<{ message: string }>("/api/user/delete-account", {
+    method: "DELETE",
+  });
+  
+  // Clear the token
+  setAuthToken(null);
+}
+
 // ============================================
 // USER LOOKUP
 // ============================================

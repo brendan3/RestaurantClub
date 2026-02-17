@@ -11,11 +11,14 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Settings, Award, Star, LogOut, Users, User, Bell, ChevronRight } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Settings, Award, Star, LogOut, Users, User, Bell, ChevronRight, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { logout, getUserClubs, getWishlist, removeFromWishlist, updateUserProfile, uploadUserAvatar, getUserById, type Club, type WishlistRestaurant, type PublicUser } from "@/lib/api";
+import { logout, getUserClubs, getWishlist, removeFromWishlist, updateUserProfile, uploadUserAvatar, getUserById, deleteAccount, type Club, type WishlistRestaurant, type PublicUser } from "@/lib/api";
 import { toast } from "sonner";
 import { Trash2, Heart } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function Profile({ userId }: { userId?: string }) {
   const { user, setUser } = useAuth();
@@ -26,6 +29,10 @@ export default function Profile({ userId }: { userId?: string }) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isAvatarLightboxOpen, setIsAvatarLightboxOpen] = useState(false);
+  const [isDeleteAccountOpen, setIsDeleteAccountOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleteConfirmChecked, setDeleteConfirmChecked] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [userClubs, setUserClubs] = useState<Club[]>([]);
   const [wishlist, setWishlist] = useState<WishlistRestaurant[]>([]);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -109,6 +116,28 @@ export default function Profile({ userId }: { userId?: string }) {
       setLocation("/login");
     } catch (error: any) {
       toast.error(error.message || "Failed to logout");
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== "DELETE" || !deleteConfirmChecked) {
+      toast.error("Please confirm deletion by typing DELETE and checking the box");
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    try {
+      await deleteAccount();
+      setUser(null);
+      toast.success("Account deleted successfully");
+      setLocation("/login");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete account");
+    } finally {
+      setIsDeletingAccount(false);
+      setIsDeleteAccountOpen(false);
+      setDeleteConfirmText("");
+      setDeleteConfirmChecked(false);
     }
   };
 
@@ -409,6 +438,97 @@ export default function Profile({ userId }: { userId?: string }) {
                 </div>
               )}
             </div>
+
+            {/* Delete Account */}
+            <div className="pt-4 border-t">
+              <div
+                className="flex items-center justify-between p-4 bg-destructive/5 rounded-xl hover:bg-destructive/10 transition-colors cursor-pointer border border-destructive/20"
+                onClick={() => setIsDeleteAccountOpen(true)}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-destructive/10 rounded-full flex items-center justify-center">
+                    <Trash2 className="w-5 h-5 text-destructive" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-destructive">Delete Account</p>
+                    <p className="text-xs text-muted-foreground">Permanently delete your account and data</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-destructive" />
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Account Confirmation Modal */}
+      <Dialog open={isDeleteAccountOpen} onOpenChange={setIsDeleteAccountOpen}>
+        <DialogContent className="sm:max-w-[450px] rounded-[1.25rem]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              Delete Account
+            </DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. This will permanently delete your account and all associated data.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <div className="space-y-2">
+                <p className="font-semibold">What will be deleted:</p>
+                <ul className="text-sm list-disc list-inside space-y-1">
+                  <li>Your profile and account information</li>
+                  <li>All your clubs (if you're the only owner)</li>
+                  <li>Your event history and RSVPs</li>
+                  <li>Your wishlist and reviews</li>
+                  <li>All photos and comments you've posted</li>
+                </ul>
+                <p className="text-sm mt-2">
+                  If you own clubs with other members, ownership will be transferred to another member.
+                </p>
+              </div>
+            </Alert>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Type <span className="font-mono font-bold">DELETE</span> to confirm:
+              </label>
+              <Input
+                type="text"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="DELETE"
+                className="font-mono"
+              />
+            </div>
+
+            <div className="flex items-start space-x-2">
+              <Checkbox
+                id="delete-confirm"
+                checked={deleteConfirmChecked}
+                onCheckedChange={(checked) => setDeleteConfirmChecked(checked === true)}
+              />
+              <label
+                htmlFor="delete-confirm"
+                className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                I understand this action is permanent and cannot be undone
+              </label>
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="ghost" onClick={() => setIsDeleteAccountOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteAccount}
+              disabled={isDeletingAccount || deleteConfirmText !== "DELETE" || !deleteConfirmChecked}
+            >
+              {isDeletingAccount ? "Deleting..." : "Delete Account"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
