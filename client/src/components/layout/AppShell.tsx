@@ -4,6 +4,7 @@ import { Calendar, Camera, ChevronLeft, Home, Map, MessageCircle, Plus, Upload, 
 import { ASSETS } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth-context";
 import { useEventModal } from "@/lib/event-modal-context";
 import { getPastEvents, getUpcomingEvents, uploadEventPhoto, getNotificationSummary, markNotificationsRead, type Event, type Notification } from "@/lib/api";
 import AddEventModal from "@/components/AddEventModal";
@@ -20,9 +21,11 @@ import { ToastAction } from "@/components/ui/toast";
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const [location, navigate] = useLocation();
+  const { isAuthenticated, isGuest } = useAuth();
   const { toast } = useToast();
   const { isAddEventOpen, setIsAddEventOpen, addEventDefaults, setAddEventDefaults, onEventCreated } = useEventModal();
   const [nextEvent, setNextEvent] = useState<Event | null>(null);
+  const shouldFetchAuthData = isAuthenticated && !isGuest;
 
   // Mobile "Add Photos" flow state (camera button)
   const [isPhotoFlowOpen, setIsPhotoFlowOpen] = useState(false);
@@ -42,8 +45,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
 
-  // Fetch next upcoming event for the sidebar
+  // Fetch next upcoming event for the sidebar (skip for guests to avoid 401s)
   useEffect(() => {
+    if (!shouldFetchAuthData) {
+      setNextEvent(null);
+      return;
+    }
     const fetchNextEvent = async () => {
       try {
         const events = await getUpcomingEvents();
@@ -55,10 +62,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
       }
     };
     fetchNextEvent();
-  }, [location]); // Refetch when location changes
+  }, [location, shouldFetchAuthData]); // Refetch when location changes
 
-  // Fetch notifications on mount and poll periodically
+  // Fetch notifications on mount and poll periodically (skip for guests to avoid 401s)
   const fetchNotifications = async () => {
+    if (!shouldFetchAuthData) return;
     try {
       setIsLoadingNotifications(true);
       const summary = await getNotificationSummary();
@@ -72,22 +80,26 @@ export default function AppShell({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    if (!shouldFetchAuthData) {
+      setUnreadCount(0);
+      setNotifications([]);
+      return;
+    }
     fetchNotifications();
     // Poll every 60 seconds
     const interval = setInterval(fetchNotifications, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [shouldFetchAuthData]);
 
-  // Mark as read when dropdown opens
+  // Mark as read when dropdown opens (only when authenticated)
   useEffect(() => {
-    if (isNotificationOpen && unreadCount > 0) {
-      markNotificationsRead().then((result) => {
-        setUnreadCount(result.unreadCount);
-      }).catch(() => {
-        // Silently fail
-      });
-    }
-  }, [isNotificationOpen]);
+    if (!shouldFetchAuthData || !isNotificationOpen || unreadCount <= 0) return;
+    markNotificationsRead().then((result) => {
+      setUnreadCount(result.unreadCount);
+    }).catch(() => {
+      // Silently fail
+    });
+  }, [isNotificationOpen, unreadCount, shouldFetchAuthData]);
 
   // Format relative time
   const formatRelativeTime = (dateString: string): string => {
@@ -191,6 +203,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
   }, [selectedEventId, upcomingEvents, pastEvents]);
 
   const loadEventsForPicker = async () => {
+    if (!shouldFetchAuthData) {
+      setUpcomingEvents([]);
+      setPastEvents([]);
+      return;
+    }
     setIsLoadingEvents(true);
     try {
       const [upcoming, past] = await Promise.all([getUpcomingEvents(), getPastEvents()]);

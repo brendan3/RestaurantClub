@@ -22,10 +22,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const handleAuthExpired = () => {
     setUser(null);
-    setIsGuest(false);
     setAuthToken(null);
-    toast.error("Your session has expired. Please log in again.");
-    // Redirect to login - will happen automatically via ProtectedRoute
+    // Only show toast and clear guest flag if not already in guest mode (guests have no token; don't kick them out)
+    setIsGuest((currentGuest) => {
+      if (!currentGuest) {
+        toast.error("Your session has expired. Please log in again.");
+        return false;
+      }
+      return true; // Keep guest mode
+    });
   };
 
   const refreshUser = async () => {
