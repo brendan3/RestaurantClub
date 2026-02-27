@@ -1039,9 +1039,9 @@ Sign up at the app and enter the code to join!`;
       </Dialog>
 
       {/* Two Column Layout */}
-      <div className="grid md:grid-cols-3 gap-8">
+      <div className="grid lg:grid-cols-3 gap-8">
         {/* Left Column: Status & Actions */}
-        <div className="md:col-span-2 space-y-8">
+        <div className="lg:col-span-2 space-y-8">
           
           {/* Picker Status */}
           {upcomingEvent && (
