@@ -1191,15 +1191,15 @@ Sign up at the app and enter the code to join!`;
             <p className="text-sm text-muted-foreground mb-6">You're on a roll!</p>
             
             <div className="grid grid-cols-2 gap-4 text-left">
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-border/50">
+              <div className="bg-white p-4 rounded-2xl shadow-sm border border-border/50 overflow-hidden">
                 <span className="block text-xs text-muted-foreground font-bold uppercase tracking-wide mb-1">Dinners</span>
-                <span className="block text-3xl font-heading font-bold text-foreground">
+                <span className="block text-2xl font-heading font-bold text-foreground truncate">
                   {user?.stats?.totalDinners || 0}
                 </span>
               </div>
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-border/50">
+              <div className="bg-white p-4 rounded-2xl shadow-sm border border-border/50 overflow-hidden">
                 <span className="block text-xs text-muted-foreground font-bold uppercase tracking-wide mb-1">Avg Bill</span>
-                <span className="block text-3xl font-heading font-bold text-primary">
+                <span className="block text-2xl font-heading font-bold text-primary truncate">
                   ${user?.stats?.avgBill || 0}
                 </span>
               </div>

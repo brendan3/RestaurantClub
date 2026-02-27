@@ -308,24 +308,19 @@ export default function AppShell({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-background font-sans flex flex-col md:flex-row max-w-screen-2xl mx-auto overflow-hidden">
       
       {/* Desktop Sidebar - Floating Style */}
-      <aside className="hidden md:flex flex-col w-20 lg:w-64 p-4 shrink-0 sticky top-0 h-screen">
+      <aside className="hidden md:flex flex-col w-20 md:w-64 p-4 shrink-0 sticky top-0 h-screen">
         <div className="bg-card/50 h-full rounded-[2rem] border border-white/50 shadow-sm p-4 flex flex-col">
-            <Link href="/" className="flex items-center justify-center lg:justify-start gap-3 mb-8 p-2 cursor-pointer hover:opacity-80 transition-opacity">
+            <Link href="/" className="flex items-center justify-center md:justify-start gap-3 mb-8 p-2 cursor-pointer hover:opacity-80 transition-opacity">
             <img src={ASSETS.mascot} alt="Mascot" className="w-10 h-10 object-contain drop-shadow-sm hover:scale-110 transition-transform duration-500" />
-            <div className="hidden lg:block">
+            <div className="hidden md:block">
                 <h1 className="font-heading font-bold text-xl text-primary leading-tight tracking-tight">Restaurant<br/><span className="text-foreground/80">Club</span></h1>
             </div>
             </Link>
 
             {/* Desktop Search Restaurants Button */}
-            <div className="mb-6 hidden lg:block">
+            <div className="mb-6 hidden md:block">
                 <Button onClick={() => setIsAddEventOpen(true)} className="w-full rounded-2xl font-bold shadow-soft hover:shadow-lg hover:-translate-y-1 transition-all bg-primary text-white h-12">
                     <Search className="w-5 h-5 mr-2" /> Search Restaurants
-                </Button>
-            </div>
-            <div className="mb-6 lg:hidden flex justify-center">
-                <Button onClick={() => setIsAddEventOpen(true)} size="icon" className="rounded-2xl font-bold shadow-soft bg-primary text-white h-10 w-10">
-                    <Search className="w-5 h-5" />
                 </Button>
             </div>
 
@@ -333,34 +328,34 @@ export default function AppShell({ children }: { children: ReactNode }) {
             {navItems.map((item) => {
                 const isActive = location === item.href;
                 return (
-                <Link key={item.href} href={item.href} className={`flex items-center justify-center lg:justify-start gap-3 px-3 py-3 rounded-2xl transition-all duration-300 font-medium group relative ${
+                <Link key={item.href} href={item.href} className={`flex items-center md:justify-start gap-3 px-3 py-3 rounded-2xl transition-all duration-300 font-medium group relative ${
                     isActive 
                         ? "bg-white shadow-sm text-primary" 
                         : "text-muted-foreground hover:bg-white/60 hover:text-foreground"
                     }`}>
-                    <item.icon className={`w-6 h-6 lg:w-5 lg:h-5 ${isActive ? "fill-current" : "group-hover:scale-110 transition-transform"}`} strokeWidth={2.5} />
-                    <span className="hidden lg:block">{item.label}</span>
-                    {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full lg:hidden" />}
+                    <item.icon className={`w-5 h-5 shrink-0 ${isActive ? "fill-current" : "group-hover:scale-110 transition-transform"}`} strokeWidth={2.5} />
+                    <span className="hidden md:block">{item.label}</span>
+                    {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full md:hidden" />}
                 </Link>
                 );
             })}
             {/* Add Club Link Explicitly for Desktop if not in main items */}
-            <Link href="/club" className={`flex items-center justify-center lg:justify-start gap-3 px-3 py-3 rounded-2xl transition-all duration-300 font-medium group relative ${
+            <Link href="/club" className={`flex items-center md:justify-start gap-3 px-3 py-3 rounded-2xl transition-all duration-300 font-medium group relative ${
                     location === "/club" 
                         ? "bg-white shadow-sm text-primary" 
                         : "text-muted-foreground hover:bg-white/60 hover:text-foreground"
                     }`}>
-                <Users className={`w-6 h-6 lg:w-5 lg:h-5 ${location === "/club" ? "fill-current" : "group-hover:scale-110 transition-transform"}`} strokeWidth={2.5} />
-                <span className="hidden lg:block">Club</span>
+                <Users className={`w-5 h-5 shrink-0 ${location === "/club" ? "fill-current" : "group-hover:scale-110 transition-transform"}`} strokeWidth={2.5} />
+                <span className="hidden md:block">Club</span>
             </Link>
             </nav>
 
             {nextEvent && (
-            <div className="mt-auto pt-6 border-t border-border/50 hidden lg:block">
+            <div className="mt-auto pt-6 border-t border-border/50 hidden md:block">
                 <Link href={`/event/${nextEvent.id}`}>
                   <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10 hover:bg-primary/10 transition-colors cursor-pointer">
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Next Up</p>
-                    <p className="text-sm font-bold text-foreground">{nextEvent.restaurantName}</p>
+                    <p className="text-sm font-bold text-foreground truncate">{nextEvent.restaurantName}</p>
                     <p className="text-xs text-primary font-medium mt-1">
                       {getDaysLabel(getDaysUntil(nextEvent.eventDate))}
                     </p>

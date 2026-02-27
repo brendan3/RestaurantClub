@@ -818,28 +818,30 @@ export class DatabaseStorage implements IStorage {
 
     // For each owned club, transfer ownership or delete
     for (const { clubId } of ownedClubs) {
-      // Get all members of this club
       const members = await db
         .select({ userId: clubMembers.userId, role: clubMembers.role })
         .from(clubMembers)
         .where(eq(clubMembers.clubId, clubId));
 
-      // If there are other members, transfer ownership to the first admin or first member
       const otherMembers = members.filter(m => m.userId !== userId);
       if (otherMembers.length > 0) {
-        // Find an admin first, otherwise use first member
         const newOwner = otherMembers.find(m => m.role === "admin") || otherMembers[0];
         await db
           .update(clubMembers)
           .set({ role: "owner" })
           .where(and(eq(clubMembers.clubId, clubId), eq(clubMembers.userId, newOwner.userId)));
       } else {
-        // No other members, delete the club (cascade will handle related data)
         await db.delete(clubs).where(eq(clubs.id, clubId));
       }
     }
 
-    // Delete user (cascade will handle clubMembers, eventAttendees, etc.)
+    // Delete events where user is the picker (FK has no onDelete cascade)
+    await db.delete(events).where(eq(events.pickerId, userId));
+
+    // Delete date polls where user is the creator (FK has no onDelete cascade)
+    await db.delete(datePolls).where(eq(datePolls.createdById, userId));
+
+    // Delete user (remaining cascading FKs handle clubMembers, attendees, photos, etc.)
     await db.delete(users).where(eq(users.id, userId));
   }
 }
