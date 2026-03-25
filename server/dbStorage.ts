@@ -3,7 +3,7 @@ import { db } from "./db"; // <-- FIX 1: Import 'db' directly (not getDb)
 import { 
   users, events, clubs, clubMembers, eventAttendees, eventTags, wishlistRestaurants, eventPhotos,
   datePolls, datePollOptions, datePollVotes, notifications, clubSuperlatives, pushDevices,
-  photoComments, eventReviews,
+  photoComments, eventReviews, pickerHistory,
   type User, type InsertUser, type Event, type Club, type WishlistRestaurant, type EventPhoto,
   type DatePoll, type DatePollOption, type DatePollWithOptions, type Notification, type ClubSuperlative, type PushDevice,
   type PhotoComment, type EventReview,
@@ -169,6 +169,7 @@ export class DatabaseStorage implements IStorage {
         type: clubs.type,
         joinCode: clubs.joinCode,
         logo: clubs.logo,
+        currentPickerId: clubs.currentPickerId,
         createdAt: clubs.createdAt,
       })
       .from(clubs)
@@ -807,6 +808,180 @@ export class DatabaseStorage implements IStorage {
   async getPushDevicesForUsers(userIds: string[]): Promise<PushDevice[]> {
     if (userIds.length === 0) return [];
     return await db.select().from(pushDevices).where(inArray(pushDevices.userId, userIds));
+  }
+
+  // ============================================
+  // PICKER ROTATION
+  // ============================================
+
+  async initializePickerRotation(clubId: string): Promise<string | null> {
+    const members = await db
+      .select({ id: clubMembers.id, userId: clubMembers.userId, pickerOrder: clubMembers.pickerOrder })
+      .from(clubMembers)
+      .where(eq(clubMembers.clubId, clubId));
+
+    if (members.length === 0) return null;
+
+    // Check if already initialized (any member has a pickerOrder)
+    const alreadyInitialized = members.some(m => m.pickerOrder !== null);
+    if (alreadyInitialized) {
+      const club = await db.select().from(clubs).where(eq(clubs.id, clubId)).limit(1);
+      return club[0]?.currentPickerId ?? null;
+    }
+
+    // Fisher-Yates shuffle
+    const shuffled = [...members];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    // Assign pickerOrder to each member
+    for (let i = 0; i < shuffled.length; i++) {
+      await db.update(clubMembers)
+        .set({ pickerOrder: i })
+        .where(eq(clubMembers.id, shuffled[i].id));
+    }
+
+    const firstPickerId = shuffled[0].userId;
+
+    // Set current picker on the club
+    await db.update(clubs)
+      .set({ currentPickerId: firstPickerId })
+      .where(eq(clubs.id, clubId));
+
+    return firstPickerId;
+  }
+
+  async advancePickerIfNeeded(clubId: string): Promise<void> {
+    const club = await db.select().from(clubs).where(eq(clubs.id, clubId)).limit(1);
+    if (!club[0] || !club[0].currentPickerId) return;
+
+    const currentPickerId = club[0].currentPickerId;
+
+    // Find the most recent event for this club where the picker is the current picker
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    const recentPastEvents = await db
+      .select()
+      .from(events)
+      .where(and(
+        eq(events.clubId, clubId),
+        eq(events.pickerId, currentPickerId),
+        lt(events.eventDate, now)
+      ))
+      .orderBy(desc(events.eventDate))
+      .limit(1);
+
+    if (recentPastEvents.length === 0) return;
+
+    const lastEvent = recentPastEvents[0];
+
+    // Check if we already recorded this event in picker history
+    const existingHistory = await db
+      .select()
+      .from(pickerHistory)
+      .where(and(
+        eq(pickerHistory.clubId, clubId),
+        eq(pickerHistory.eventId, lastEvent.id)
+      ))
+      .limit(1);
+
+    if (existingHistory.length > 0) return; // Already advanced for this event
+
+    // Get all members sorted by pickerOrder
+    const members = await db
+      .select({ userId: clubMembers.userId, pickerOrder: clubMembers.pickerOrder })
+      .from(clubMembers)
+      .where(eq(clubMembers.clubId, clubId))
+      .orderBy(asc(clubMembers.pickerOrder));
+
+    if (members.length === 0) return;
+
+    // Determine current round number
+    const historyCount = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(pickerHistory)
+      .where(eq(pickerHistory.clubId, clubId));
+
+    const totalPicks = Number(historyCount[0]?.count ?? 0);
+    const roundNumber = Math.floor(totalPicks / members.length) + 1;
+
+    // Record the completed pick in history
+    await db.insert(pickerHistory).values({
+      clubId,
+      userId: currentPickerId,
+      eventId: lastEvent.id,
+      roundNumber,
+    });
+
+    // Find next picker in rotation
+    const currentMember = members.find(m => m.userId === currentPickerId);
+    const currentOrder = currentMember?.pickerOrder ?? 0;
+    const nextOrder = (currentOrder + 1) % members.length;
+    const nextPicker = members.find(m => m.pickerOrder === nextOrder);
+
+    if (nextPicker) {
+      await db.update(clubs)
+        .set({ currentPickerId: nextPicker.userId })
+        .where(eq(clubs.id, clubId));
+    }
+  }
+
+  async overridePicker(clubId: string, newPickerId: string): Promise<void> {
+    // Verify the user is a member of this club
+    const membership = await db
+      .select()
+      .from(clubMembers)
+      .where(and(eq(clubMembers.clubId, clubId), eq(clubMembers.userId, newPickerId)))
+      .limit(1);
+
+    if (membership.length === 0) {
+      throw new Error("User is not a member of this club");
+    }
+
+    await db.update(clubs)
+      .set({ currentPickerId: newPickerId })
+      .where(eq(clubs.id, clubId));
+  }
+
+  async getPickerHistory(clubId: string): Promise<any[]> {
+    const rows = await db
+      .select({
+        id: pickerHistory.id,
+        userId: pickerHistory.userId,
+        userName: users.name,
+        userAvatar: users.avatar,
+        eventId: pickerHistory.eventId,
+        restaurantName: events.restaurantName,
+        roundNumber: pickerHistory.roundNumber,
+        pickedAt: pickerHistory.pickedAt,
+      })
+      .from(pickerHistory)
+      .innerJoin(users, eq(pickerHistory.userId, users.id))
+      .leftJoin(events, eq(pickerHistory.eventId, events.id))
+      .where(eq(pickerHistory.clubId, clubId))
+      .orderBy(desc(pickerHistory.pickedAt));
+
+    return rows;
+  }
+
+  async getPickerRotationOrder(clubId: string): Promise<any[]> {
+    const rows = await db
+      .select({
+        userId: clubMembers.userId,
+        userName: users.name,
+        userAvatar: users.avatar,
+        pickerOrder: clubMembers.pickerOrder,
+        role: clubMembers.role,
+      })
+      .from(clubMembers)
+      .innerJoin(users, eq(clubMembers.userId, users.id))
+      .where(eq(clubMembers.clubId, clubId))
+      .orderBy(asc(clubMembers.pickerOrder));
+
+    return rows;
   }
 
   async deleteUser(userId: string): Promise<void> {

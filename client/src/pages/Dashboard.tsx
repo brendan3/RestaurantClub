@@ -1044,7 +1044,7 @@ Sign up at the app and enter the code to join!`;
         <div className="lg:col-span-2 space-y-8">
           
           {/* Picker Status */}
-          {upcomingEvent && (
+          {currentClub && (
             <Card className="border-none shadow-soft bg-white/60 backdrop-blur-sm overflow-hidden relative">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-xl text-foreground/80">
@@ -1053,22 +1053,46 @@ Sign up at the app and enter the code to join!`;
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex items-center gap-6">
-                <div className="relative">
-                  <Avatar className="w-20 h-20 border-4 border-white shadow-float">
-                    <AvatarFallback>PK</AvatarFallback>
-                  </Avatar>
-                  <div className="absolute -bottom-2 -right-2 bg-primary text-white text-xs px-3 py-1 rounded-full font-bold shadow-sm border-2 border-white">
-                    Picker
-                  </div>
-                </div>
-                <div>
-                  <p className="font-heading font-bold text-2xl text-foreground">
-                    {upcomingEvent.pickerId === user?.id ? "You" : "Someone"}
-                  </p>
-                  <p className="text-muted-foreground text-base">
-                    {upcomingEvent.pickerId === user?.id ? "are" : "is"} calling the shots this month.
-                  </p>
-                </div>
+                {(() => {
+                  const pickerId = currentClub.currentPickerId;
+                  const pickerMember = currentClub.membersList?.find(m => m.id === pickerId);
+                  const isMe = pickerId === user?.id;
+                  const pickerName = isMe ? "You" : (pickerMember?.name || "Not assigned");
+                  const pickerInitials = pickerMember?.name?.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() || "?";
+                  return (
+                    <>
+                      <div className="relative">
+                        <Avatar className="w-20 h-20 border-4 border-white shadow-float">
+                          <AvatarImage src={pickerMember?.avatar || undefined} />
+                          <AvatarFallback>{pickerInitials}</AvatarFallback>
+                        </Avatar>
+                        <div className="absolute -bottom-2 -right-2 bg-primary text-white text-xs px-3 py-1 rounded-full font-bold shadow-sm border-2 border-white">
+                          Picker
+                        </div>
+                      </div>
+                      <div>
+                        <p className="font-heading font-bold text-2xl text-foreground">
+                          {pickerName}
+                        </p>
+                        <p className="text-muted-foreground text-base">
+                          {isMe ? "are" : "is"} calling the shots this time.
+                        </p>
+                        {isMe && !upcomingEvent && (
+                          <Button
+                            size="sm"
+                            className="mt-2 rounded-full gap-1"
+                            onClick={() => {
+                              if (isGuest) { showSignupPrompt("create events"); return; }
+                              setIsAddEventOpen(true);
+                            }}
+                          >
+                            <Search className="w-4 h-4" /> Pick a Restaurant
+                          </Button>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
               </CardContent>
             </Card>
           )}

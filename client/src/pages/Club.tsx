@@ -620,6 +620,99 @@ Sign up at the app and enter the code to join!`;
         </Card>
       </div>
 
+      {/* Picker Rotation */}
+      <Card className="border-none shadow-soft">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 font-heading">
+            <UtensilsCrossed className="w-5 h-5 text-primary" />
+            Picker Rotation
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {(() => {
+            const pickerId = club.currentPickerId;
+            const pickerMember = club.membersList.find(m => m.id === pickerId);
+            const isMe = pickerId === user?.id;
+            const isOwner = club.membersList.find(m => m.id === user?.id)?.role === "owner";
+            return (
+              <div className="space-y-4">
+                <div className="flex items-center gap-4 p-4 bg-primary/5 rounded-2xl border border-primary/10">
+                  <Avatar className="w-14 h-14 border-2 border-white shadow-sm">
+                    <AvatarImage src={pickerMember?.avatar || undefined} />
+                    <AvatarFallback>{pickerMember?.name?.[0] || "?"}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Current Picker</p>
+                    <p className="font-heading font-bold text-xl">
+                      {isMe ? "You" : (pickerMember?.name || "Not assigned yet")}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {pickerId ? (isMe ? "It's your turn to choose!" : "is choosing the next restaurant") : "Rotation will start with the first event"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Rotation order */}
+                <div>
+                  <p className="text-sm font-bold text-muted-foreground mb-2">Rotation Order</p>
+                  <div className="flex flex-wrap gap-2">
+                    {club.membersList.map((member, idx) => (
+                      <div
+                        key={member.id}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium ${
+                          member.id === pickerId
+                            ? "bg-primary/10 text-primary border border-primary/20"
+                            : "bg-muted/50 text-muted-foreground"
+                        }`}
+                      >
+                        <span className="text-xs font-bold w-5 text-center">{idx + 1}</span>
+                        <Avatar className="w-6 h-6">
+                          <AvatarImage src={member.avatar || undefined} />
+                          <AvatarFallback className="text-[10px]">{member.name[0]}</AvatarFallback>
+                        </Avatar>
+                        <span className="truncate max-w-[100px]">{member.id === user?.id ? "You" : member.name}</span>
+                        {member.id === pickerId && <Badge className="bg-primary text-white text-[10px] px-1.5 py-0">Now</Badge>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Captain override */}
+                {isOwner && club.membersList.length > 1 && (
+                  <div className="pt-2 border-t border-border/50">
+                    <p className="text-xs text-muted-foreground mb-2">Captain Override</p>
+                    <div className="flex flex-wrap gap-2">
+                      {club.membersList
+                        .filter(m => m.id !== pickerId)
+                        .map((member) => (
+                          <Button
+                            key={member.id}
+                            variant="outline"
+                            size="sm"
+                            className="rounded-full text-xs"
+                            onClick={async () => {
+                              try {
+                                const { overrideCurrentPicker } = await import("@/lib/api");
+                                await overrideCurrentPicker(club.id, member.id);
+                                toast.success(`Picker reassigned to ${member.name}`);
+                                loadData();
+                              } catch (e: any) {
+                                toast.error(e?.message || "Failed to reassign picker");
+                              }
+                            }}
+                          >
+                            Assign {member.name}
+                          </Button>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </CardContent>
+      </Card>
+
       {/* Edit Hall of Fame Modal */}
       <Dialog open={isEditSuperlativeOpen} onOpenChange={setIsEditSuperlativeOpen}>
         <DialogContent className="sm:max-w-[450px] rounded-[1.25rem]">

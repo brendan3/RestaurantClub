@@ -26,7 +26,7 @@ export interface Event {
   totalBill?: number | null;
   pickerId: string;
   imageUrl?: string | null;
-  // Google Places integration
+  menuUrl?: string | null;
   placeId?: string | null;
   placePhotoName?: string | null;
   createdAt?: string;
@@ -109,7 +109,29 @@ export interface Club {
   }>;
   type: "private" | "public";
   joinCode?: string;
+  currentPickerId?: string | null;
   createdAt: string;
+}
+
+export interface PickerInfo {
+  currentPickerId: string | null;
+  rotationOrder: Array<{
+    userId: string;
+    userName: string;
+    userAvatar?: string;
+    pickerOrder: number;
+    role: string;
+  }>;
+  history: Array<{
+    id: string;
+    userId: string;
+    userName: string;
+    userAvatar?: string;
+    eventId?: string;
+    restaurantName?: string;
+    roundNumber: number;
+    pickedAt: string;
+  }>;
 }
 
 export interface AuthResponse {
@@ -315,6 +337,21 @@ export async function joinClub(joinCode: string): Promise<{ message: string; clu
 }
 
 // ============================================
+// PICKER ROTATION FUNCTIONS
+// ============================================
+
+export async function getPickerInfo(clubId: string): Promise<PickerInfo> {
+  return apiRequest<PickerInfo>(`/api/clubs/${clubId}/picker-info`);
+}
+
+export async function overrideCurrentPicker(clubId: string, newPickerId: string): Promise<void> {
+  await apiRequest(`/api/clubs/${clubId}/current-picker`, {
+    method: "PATCH",
+    body: JSON.stringify({ newPickerId }),
+  });
+}
+
+// ============================================
 // EVENT FUNCTIONS
 // ============================================
 
@@ -357,6 +394,7 @@ export async function createEvent(eventData: {
   notes?: string;
   maxSeats?: number;
   imageUrl?: string;
+  menuUrl?: string;
   placeId?: string | null;
   placePhotoName?: string | null;
 }): Promise<Event> {

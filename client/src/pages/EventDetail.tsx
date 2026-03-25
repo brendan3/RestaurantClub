@@ -29,7 +29,7 @@ import {
   deleteEvent,
   type EventPhoto,
 } from "@/lib/api";
-import { Heart } from "lucide-react";
+import { Heart, ExternalLink, UtensilsCrossed, Link2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
 
@@ -707,6 +707,51 @@ export default function EventDetail() {
               )}
             </CardContent>
           </Card>
+
+          {/* Restaurant Actions (Google Maps + Menu) */}
+          {event && (
+            <div className="flex flex-wrap gap-3">
+              {event.placeId && (
+                <Button
+                  variant="outline"
+                  className="rounded-full gap-2 font-medium"
+                  onClick={() => window.open(`https://www.google.com/maps/place/?q=place_id:${event.placeId}`, "_blank")}
+                >
+                  <ExternalLink className="w-4 h-4" /> View on Google Maps
+                </Button>
+              )}
+              {event.menuUrl && (
+                <Button
+                  variant="outline"
+                  className="rounded-full gap-2 font-medium"
+                  onClick={() => window.open(event.menuUrl!, "_blank")}
+                >
+                  <UtensilsCrossed className="w-4 h-4" /> View Menu
+                </Button>
+              )}
+              {canEditDetails && !event.menuUrl && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-full gap-2 text-muted-foreground hover:text-primary"
+                  onClick={() => {
+                    const url = prompt("Paste a link to the restaurant's menu:");
+                    if (url && url.trim()) {
+                      updateEvent(event.id, { menuUrl: url.trim() } as any)
+                        .then((updated) => {
+                          setEvent(updated);
+                          toast.success("Menu link added!");
+                        })
+                        .catch(() => toast.error("Failed to save menu link"));
+                    }
+                  }}
+                >
+                  <Link2 className="w-4 h-4" /> Add Menu Link
+                </Button>
+              )}
+            </div>
+          )}
+
           {/* Notes Section */}
           <Card className="border-none shadow-soft">
             <CardHeader className="flex flex-row items-center justify-between">

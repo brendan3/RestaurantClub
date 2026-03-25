@@ -339,9 +339,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             clubJoinCode = generateJoinCode();
             await storage.updateClubJoinCode(club.id, clubJoinCode);
           }
+
+          // Lazy-init picker rotation if not set up yet
+          let currentPickerId = club.currentPickerId;
+          if (!currentPickerId && members.length > 0) {
+            currentPickerId = await storage.initializePickerRotation(club.id);
+          }
+
+          // Advance picker if last event has passed
+          if (currentPickerId) {
+            await storage.advancePickerIfNeeded(club.id);
+            // Re-fetch in case it advanced
+            const updated = await storage.getUserClubs(req.user!.id);
+            const updatedClub = updated.find(c => c.id === club.id);
+            if (updatedClub) currentPickerId = updatedClub.currentPickerId;
+          }
           
           return {
             ...club,
+            currentPickerId,
             joinCode: clubJoinCode,
             members: members.length,
             membersList: members.map(m => ({
@@ -361,6 +377,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // ============================================
+  // PICKER ROTATION ENDPOINTS
+  // ============================================
+
+  // Get picker info for a club
+  app.get("/api/clubs/:clubId/picker-info", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.json({ currentPickerId: null, rotationOrder: [], history: [] });
+    }
+    try {
+      const { clubId } = req.params;
+      const rotationOrder = await storage.getPickerRotationOrder(clubId);
+      const history = await storage.getPickerHistory(clubId);
+      const clubData = await storage.getUserClubs(req.user!.id);
+      const club = clubData.find(c => c.id === clubId);
+      res.json({
+        currentPickerId: club?.currentPickerId ?? null,
+        rotationOrder,
+        history,
+      });
+    } catch (error) {
+      console.error("Error fetching picker info:", error);
+      res.status(500).json({ error: "Failed to fetch picker info" });
+    }
+  });
+
+  // Override current picker (owner/admin only)
+  app.patch("/api/clubs/:clubId/current-picker", auth.requireAuth, async (req, res) => {
+    if (useMockData) {
+      return res.json({ message: "Mock mode" });
+    }
+    try {
+      const { clubId } = req.params;
+      const { newPickerId } = req.body;
+      if (!newPickerId) {
+        return res.status(400).json({ error: "newPickerId is required" });
+      }
+
+      // Verify requester is owner or admin
+      const members = await storage.getClubMembers(clubId);
+      const requester = members.find(m => m.id === req.user!.id);
+      if (!requester || (requester.role !== "owner" && requester.role !== "admin")) {
+        return res.status(403).json({ error: "Only the club captain (owner/admin) can override the picker" });
+      }
+
+      await storage.overridePicker(clubId, newPickerId);
+      res.json({ success: true, currentPickerId: newPickerId });
+    } catch (error: any) {
+      console.error("Error overriding picker:", error);
+      res.status(500).json({ error: error.message || "Failed to override picker" });
+    }
+  });
+
   // Create a new club
   app.post("/api/clubs", auth.requireAuth, async (req, res) => {
     if (useMockData) {
@@ -894,7 +963,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     try {
-      const { restaurantName, cuisine, eventDate, location, notes, maxSeats, imageUrl, placeId, placePhotoName } = req.body;
+      const { restaurantName, cuisine, eventDate, location, notes, maxSeats, imageUrl, placeId, placePhotoName, menuUrl } = req.body;
       
       if (!restaurantName || !eventDate) {
         return res.status(400).json({ 
@@ -902,7 +971,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Validate maxSeats if provided
       if (maxSeats !== undefined && (typeof maxSeats !== 'number' || maxSeats < 1 || maxSeats > 100)) {
         return res.status(400).json({ 
           error: "Max seats must be a number between 1 and 100" 
@@ -910,16 +978,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get user's club
-      const clubs = await storage.getUserClubs(req.user!.id);
-      if (clubs.length === 0) {
+      const userClubs = await storage.getUserClubs(req.user!.id);
+      if (userClubs.length === 0) {
         return res.status(400).json({ 
           error: "You must be in a club to create events" 
         });
       }
+
+      const club = userClubs[0];
+
+      // Gate: only the current picker can create events (if rotation is set up)
+      if (club.currentPickerId && club.currentPickerId !== req.user!.id) {
+        // Check if requester is owner/admin (they can override)
+        const members = await storage.getClubMembers(club.id);
+        const requester = members.find(m => m.id === req.user!.id);
+        const isAdmin = requester && (requester.role === "owner" || requester.role === "admin");
+        if (!isAdmin) {
+          return res.status(403).json({ 
+            error: "It's not your turn to pick! Only the current picker can create events." 
+          });
+        }
+      }
       
       // Create event
       const event = await storage.createEvent({
-        clubId: clubs[0].id,
+        clubId: club.id,
         restaurantName,
         cuisine: cuisine || "Restaurant",
         eventDate: new Date(eventDate),
@@ -929,13 +1012,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "confirmed",
         pickerId: req.user!.id,
         imageUrl: imageUrl || null,
+        menuUrl: menuUrl || null,
         placeId: placeId || null,
         placePhotoName: placePhotoName || null,
       });
       
       // Create notifications for all club members
       try {
-        const members = await storage.getClubMembers(clubs[0].id);
+        const members = await storage.getClubMembers(club.id);
         const memberIds = members.map((m) => m.id);
         const eventDateFormatted = new Date(eventDate).toLocaleDateString("en-US", {
           weekday: "short",
@@ -992,6 +1076,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         notes,
         maxSeats,
         imageUrl,
+        menuUrl,
         placeId,
         placePhotoName,
         rating,
@@ -1035,6 +1120,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (imageUrl !== undefined) updates.imageUrl = imageUrl;
       if (placeId !== undefined) updates.placeId = placeId;
       if (placePhotoName !== undefined) updates.placePhotoName = placePhotoName;
+      if (menuUrl !== undefined) updates.menuUrl = menuUrl;
       if (rating !== undefined) updates.rating = rating;
       if (totalBill !== undefined) updates.totalBill = totalBill;
       if (status !== undefined) updates.status = status;

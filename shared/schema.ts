@@ -25,6 +25,7 @@ export const clubs = pgTable("clubs", {
   type: text("type").notNull(), // 'private' | 'public'
   joinCode: varchar("join_code", { length: 16 }),
   logo: text("logo"), // nullable; emoji or URL
+  currentPickerId: varchar("current_picker_id").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -44,6 +45,7 @@ export const clubMembers = pgTable("club_members", {
   clubId: varchar("club_id").notNull().references(() => clubs.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   role: text("role").default("member"), // 'owner' | 'admin' | 'member'
+  pickerOrder: integer("picker_order"), // position in the rotation (0-based)
   joinedAt: timestamp("joined_at").defaultNow(),
 });
 
@@ -70,6 +72,16 @@ export const clubSuperlatives = pgTable(
   })
 );
 
+// Picker history (rotation audit trail)
+export const pickerHistory = pgTable("picker_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clubId: varchar("club_id").notNull().references(() => clubs.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  eventId: varchar("event_id").references(() => events.id, { onDelete: "set null" }),
+  roundNumber: integer("round_number").notNull().default(1),
+  pickedAt: timestamp("picked_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 // Events/Dinners table
 export const events = pgTable("events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -78,16 +90,16 @@ export const events = pgTable("events", {
   cuisine: text("cuisine").notNull(),
   eventDate: timestamp("event_date").notNull(),
   location: text("location"),
-  notes: text("notes"), // Event description/notes
-  maxSeats: integer("max_seats"), // Optional max attendees
+  notes: text("notes"),
+  maxSeats: integer("max_seats"),
   status: text("status").notNull(), // 'pending' | 'confirmed' | 'past'
   rating: integer("rating"),
   totalBill: integer("total_bill"),
   pickerId: varchar("picker_id").notNull().references(() => users.id),
   imageUrl: text("image_url"),
-  // Google Places integration
-  placeId: varchar("place_id", { length: 255 }), // Google Places ID
-  placePhotoName: varchar("place_photo_name", { length: 512 }), // Google Places photo reference
+  menuUrl: text("menu_url"), // optional link to restaurant menu
+  placeId: varchar("place_id", { length: 255 }),
+  placePhotoName: varchar("place_photo_name", { length: 512 }),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -299,6 +311,8 @@ export const pushDevices = pgTable(
 
 export type PushDevice = typeof pushDevices.$inferSelect;
 export type InsertPushDevice = typeof pushDevices.$inferInsert;
+
+export type PickerHistory = typeof pickerHistory.$inferSelect;
 
 export type SignupInput = z.infer<typeof signupSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

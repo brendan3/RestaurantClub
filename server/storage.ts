@@ -156,6 +156,13 @@ export interface IStorage {
   registerPushDevice(userId: string, deviceToken: string, platform: string): Promise<void>;
   getPushDevicesForUsers(userIds: string[]): Promise<PushDevice[]>;
 
+  // Picker rotation
+  initializePickerRotation(clubId: string): Promise<string | null>;
+  advancePickerIfNeeded(clubId: string): Promise<void>;
+  overridePicker(clubId: string, newPickerId: string): Promise<void>;
+  getPickerHistory(clubId: string): Promise<any[]>;
+  getPickerRotationOrder(clubId: string): Promise<any[]>;
+
   // Account deletion
   deleteUser(userId: string): Promise<void>;
 }
@@ -525,6 +532,14 @@ export class MemStorage implements IStorage {
         updatedAt: d.updatedAt,
       })) as any;
   }
+
+  // Picker rotation stubs (MemStorage is only used in mock mode)
+  async initializePickerRotation(_clubId: string): Promise<string | null> { return null; }
+  async advancePickerIfNeeded(_clubId: string): Promise<void> {}
+  async overridePicker(_clubId: string, _newPickerId: string): Promise<void> {}
+  async getPickerHistory(_clubId: string): Promise<any[]> { return []; }
+  async getPickerRotationOrder(_clubId: string): Promise<any[]> { return []; }
+  async deleteUser(_userId: string): Promise<void> {}
 }
 
 // Use database storage if DATABASE_URL is set, otherwise use in-memory
